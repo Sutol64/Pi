@@ -366,7 +366,7 @@ class _EditorScreenState extends State<EditorScreen>
 
       final root = (l.accountRoot ?? '').trim();
 
-      final child = (l.accountPath ?? '').trim();
+      final child = l.accountPath.trim();
 
       final List<String> childParts;
 
