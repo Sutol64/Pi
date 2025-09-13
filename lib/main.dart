@@ -1,36 +1,26 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
-
 import 'package:flutter/services.dart';
-
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-
 import 'package:flutter/scheduler.dart';
+import 'dart:convert';
 
 import 'database_helper.dart';
+import 'recurring_payment_api.dart';
+import 'recurring_payment_service.dart';
+import 'package:provider/provider.dart';
+import 'widgets/recurring_payment_form.dart';
 
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   
+  // Initialize FFI database factory
+  sqfliteFfiInit();
+  databaseFactory = databaseFactoryFfi;
 
-void main() {
-
-  // Initialize sqflite ffi for desktop (Windows/Linux/macOS)
-
-  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-
-    sqfliteFfiInit();
-
-    databaseFactory = databaseFactoryFfi;
-
-  }
-
-  
-
+  // The DatabaseHelper singleton will handle database initialization on its first use.
+  // No need to open it here.
   runApp(const MyApp());
-
 }
-
-  
 
 class MyApp extends StatelessWidget {
 
@@ -47,13 +37,8 @@ class MyApp extends StatelessWidget {
       title: 'Personal Finance',
 
       theme: ThemeData(
-
         primarySwatch: Colors.blue,
-
-        // remove any global fontFamily here unless you include MaterialIcons as fallback
-
-        // fontFamily: 'YourCustomFont',  <-- remove or ensure icon font available
-
+        // Keep default font settings so Material icons render correctly.
       ),
 
       home: const HomeScreen(),
@@ -63,8 +48,6 @@ class MyApp extends StatelessWidget {
   }
 
 }
-
-  
 
 class HomeScreen extends StatelessWidget {
 
@@ -130,8 +113,6 @@ class HomeScreen extends StatelessWidget {
 
 }
 
-  
-
 class DashboardScreen extends StatelessWidget {
 
   const DashboardScreen({super.key});
@@ -141,14 +122,11 @@ class DashboardScreen extends StatelessWidget {
   @override
 
   Widget build(BuildContext context) {
-
-    return const Center(child: Text('Dashboard'));
+    return const Center(child: Icon(Icons.dashboard));
 
   }
 
 }
-
-  
 
 class EditorScreen extends StatefulWidget {
 
@@ -162,881 +140,712 @@ class EditorScreen extends StatefulWidget {
 
 }
 
-  
-
 class _EditorScreenState extends State<EditorScreen>
-
     with AutomaticKeepAliveClientMixin<EditorScreen> {
-
   final TextEditingController _descriptionController = TextEditingController();
-
+  final TextEditingController _customCadenceController = TextEditingController();
   DateTime _date = DateTime.now();
-
   List<Map<String, dynamic>> _recentTransactions = [];
 
-  
+  // New state for recurring payments
+  List<Map<String, dynamic>> _recentRecurringPayments = [];
+  Future<List<Map<String, dynamic>>>? _computedPaymentsFuture;
+  int? _recurringAccountId;
+  String? _recurringAccountRoot;
 
   // start with two lines (debit & credit)
-
   final List<_EntryLine> _lines = [
-
     _EntryLine(accountPath: 'Assets', isDebit: true),
-
     _EntryLine(accountPath: 'Expense', isDebit: false),
-
   ];
-
-  
 
   // allow digits, comma and dot (basic); parsing strips commas
-
   static final List<TextInputFormatter> _amountFormatters = [
-
     FilteringTextInputFormatter.allow(RegExp(r'[\d\.,]')),
-
   ];
 
-  
+  // Add API and service instances
+  late final RecurringPaymentService _recurringService;
+  late final RecurringPaymentApi _recurringApi;
 
   @override
-
   void initState() {
-
     super.initState();
-
+    _recurringService = RecurringPaymentService(DatabaseHelper.instance);
+    _recurringApi = RecurringPaymentApi(_recurringService);
     _loadRecentTransactions();
-
+    // Initial load of recurring payments
+    _loadRecentRecurringPayments();
   }
-
-  
 
   Future<void> _loadRecentTransactions() async {
-
     final allTxs = await DatabaseHelper.instance.fetchAllTransactions();
-
     if (mounted) {
-
       setState(() {
-
         _recentTransactions = allTxs.take(3).toList();
-
       });
-
     }
-
   }
 
-  
-
-  String _formatDate(String? iso) {
-
-    if (iso == null) return '';
-
+  // Refactored method to load recurring payments using API
+  Future<void> _loadRecentRecurringPayments() async {
+    print('Fetching recent recurring payments...');
     try {
+      // First fetch the list of recurring payments
+      final paymentsJson = await _recurringApi.fetchRecent(limit: 3);
+      print('Received payments JSON: $paymentsJson');
+      
+      final payments = List<Map<String, dynamic>>.from(jsonDecode(paymentsJson));
+      print('Decoded payments: $payments');
 
-      final dt = DateTime.parse(iso).toLocal();
+      // Immediately recompute values for all recurring payments
+      Future<List<Map<String, dynamic>>> createComputedFuture() async {
+        print('Creating computed future for ${payments.length} payments');
+        return Future.wait(payments.map((p) async {
+          print('Recomputing for account: ${p['accountId']}');
+          // Force a recomputation to get fresh values
+          final resultJson = await _recurringApi.recompute(p['accountId'] as String);
+          final result = jsonDecode(resultJson) as Map<String, dynamic>? ?? <String, dynamic>{};
+          print('Recompute result: $result');
+          return result;
+        }).toList());
+      }
 
-      return '${dt.year.toString().padLeft(4, "0")}-${dt.month.toString().padLeft(2, "0")}-${dt.day.toString().padLeft(2, "0")}';
-
-    } catch (_) {
-
-      return iso;
-
+      if (mounted) {
+        setState(() {
+          _recentRecurringPayments = payments;
+          _computedPaymentsFuture = createComputedFuture();
+        });
+        print('State updated with ${payments.length} payments');
+      }
+    } catch (e, stackTrace) {
+      print('Error loading recurring payments: $e');
+      print('Stack trace: $stackTrace');
     }
-
   }
-
-  
 
   double _parse(String text) {
-
     return double.tryParse(text.replaceAll(',', '').trim()) ?? 0.0;
-
   }
 
-  
-
   double get totalDebits => _lines
-
       .where((l) => l.isDebit)
-
       .map((l) => _parse(l.amountController.text))
-
       .fold(0.0, (a, b) => a + b);
-
-  
 
   double get totalCredits => _lines
-
       .where((l) => !l.isDebit)
-
       .map((l) => _parse(l.amountController.text))
-
       .fold(0.0, (a, b) => a + b);
-
-  
 
   bool get isBalanced => (totalDebits - totalCredits).abs() < 0.005;
 
-  
-
   void _addLine() {
-
     setState(() {
-
       _lines.add(_EntryLine(accountPath: 'Cash', isDebit: true));
-
     });
-
   }
-
-  
 
   void _removeLine(int index) {
-
     if (_lines.length <= 2) return; // keep at least two lines for double-entry
-
     setState(() {
-
       final removed = _lines.removeAt(index);
-
       removed.amountController.dispose();
-
     });
-
   }
-
-  
 
   Future<void> _pickDate() async {
-
     final picked = await showDatePicker(
-
       context: context,
-
       initialDate: _date,
-
       firstDate: DateTime(2000),
-
       lastDate: DateTime(2100),
-
     );
-
     if (picked != null) setState(() => _date = picked);
-
   }
-
-  
 
   Future<void> _submit() async {
-
     if (_lines.length < 2) {
-
       ScaffoldMessenger.of(context).showSnackBar(
-
         const SnackBar(content: Text('A transaction must have at least two lines.')),
-
       );
-
       return;
-
     }
-
-  
 
     if (!isBalanced) {
-
       ScaffoldMessenger.of(context).showSnackBar(
-
         SnackBar(
-
             content: Text(
-
                 'Entries are not balanced. Debits: ${totalDebits.toStringAsFixed(2)}, Credits: ${totalCredits.toStringAsFixed(2)}')),
-
       );
-
       return;
-
     }
-
-  
 
     String buildStoredAccount(_EntryLine l) {
-
       final root = (l.accountRoot ?? '').trim();
-
       final child = l.accountPath.trim();
-
       final List<String> childParts;
-
       if (child.isEmpty) {
-
         childParts = <String>[];
-
       } else {
-
         childParts = child.split(' > ').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
-
       }
-
       final parts = <String>[];
-
       if (root.isNotEmpty) parts.add(root);
-
       parts.addAll(childParts);
-
       return parts.join(':'); // store with colon separators per requirement
-
     }
-
-  
 
     final linesForDb = _lines
-
         .map((l) => {
-
               'account': buildStoredAccount(l),
-
               'debit': l.isDebit ? _parse(l.amountController.text) : 0.0,
-
               'credit': l.isDebit ? 0.0 : _parse(l.amountController.text),
-
             })
-
         .toList();
 
-  
-
     try {
-
       final id = await DatabaseHelper.instance.insertTransaction(
-
         date: _date,
-
         description: _descriptionController.text.trim(),
-
         lines: linesForDb,
-
       );
-
-  
 
       if (!mounted) return;
-
       showDialog<void>(
-
         context: context,
-
         builder: (ctx) => AlertDialog(
-
           title: const Text('Transaction saved'),
-
           content: Text('Transaction id: $id'),
-
           actions: [
-
             TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('OK'))
-
           ],
-
         ),
-
       );
-
-  
 
       // clear amounts and description while keeping lines (faster UX)
-
       setState(() {
-
         _descriptionController.clear();
-
         _date = DateTime.now();
-
         for (final l in _lines) {
-
           l.amountController.clear();
-
           // keep account selection, do not clear root/child unless desired
-
         }
-
       });
-
-      _loadRecentTransactions();
-
+      await _loadRecentTransactions();
+      
+      // Recompute recurring payments for any affected accounts
+      if (mounted) {
+        final affectedAccounts = linesForDb.map((l) => l['account'] as String).toSet();
+        print('Checking for recurring payments to update for accounts: $affectedAccounts');
+        
+        // Refresh recurring payments list to reflect any updates
+        await _loadRecentRecurringPayments();
+        
+        if (_recentRecurringPayments.isNotEmpty) {
+          print('Found ${_recentRecurringPayments.length} recurring payments to check');
+          for (final payment in _recentRecurringPayments) {
+            final accountId = payment['accountId'] as String;
+            if (affectedAccounts.contains(accountId)) {
+              print('Recomputing recurring payment for account: $accountId');
+              await _recurringApi.recompute(accountId);
+            }
+          }
+          // Reload the recurring payments list with updated values
+          await _loadRecentRecurringPayments();
+        }
+      }
+      
     } catch (e) {
-
       if (!mounted) return;
-
       ScaffoldMessenger.of(context).showSnackBar(
-
         SnackBar(content: Text('Failed to save transaction: $e')),
-
       );
-
     }
-
   }
 
-  
+  // Refactored recurring payment setup: only store account and root category
+  Future<void> _setupRecurringPayment() async {
+    if (_recurringAccountId == null || _recurringAccountRoot == null || _recurringAccountRoot!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select an account for the recurring payment.')),
+      );
+      return;
+    }
+    try {
+      print('Setting up recurring payment with accountId: $_recurringAccountId, rootCategory: $_recurringAccountRoot');
+      
+      // Call the API to compute and save the recurring payment.
+      // The backend will handle the calculation based on transaction history.
+      final response = await _recurringApi.createOrUpdate({
+        'accountId': _recurringAccountId!,
+        'rootCategory': _recurringAccountRoot!,
+        // 'method' will default to 'auto' on the backend
+      });
+      
+      print('Recurring payment API response: $response');
+      
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Recurring payment saved successfully!')),
+      );
+      
+      print('Loading recent recurring payments after save...');
+      await _loadRecentRecurringPayments();
+      print('Recent recurring payments loaded');
+      
+    } catch (e, stackTrace) {
+      print('Error saving recurring payment: $e');
+      print('Stack trace: $stackTrace');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to save recurring payment: $e')),
+      );
+    }
+  }
+
+  // Remove amount/date inputs from recurring payment form UI
+  Widget _buildRecurringPaymentsSetup() {
+    return Card(
+      elevation: 2,
+      margin: const EdgeInsets.symmetric(vertical: 8.0),
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Setup Recurring Payment', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 16),
+            AccountInput(
+              onAccountSelected: (id, childPath, rootName) {
+                setState(() {
+                  _recurringAccountId = id;
+                  _recurringAccountRoot = rootName;
+                });
+              },
+            ),
+            const SizedBox(height: 16),
+            Align(
+              alignment: Alignment.centerRight,
+              child: ElevatedButton.icon(
+                onPressed: _setupRecurringPayment,
+                icon: const Icon(Icons.save_alt),
+                label: const Text('Save Recurring'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.secondary,
+                  foregroundColor: Theme.of(context).colorScheme.onSecondary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
 
   @override
-
   void dispose() {
-
     _descriptionController.dispose();
-
+    _customCadenceController.dispose();
     for (final l in _lines) {
-
       l.amountController.dispose();
-
     }
-
     super.dispose();
-
   }
 
-  
-
   @override
-
   bool get wantKeepAlive => true;
 
-  
-
   @override
-
   Widget build(BuildContext context) {
-
     super.build(context); // required for AutomaticKeepAliveClientMixin
-
     return ListView(
-
       padding: const EdgeInsets.all(12.0),
-
       children: [
-
         // 1. Calendar and Description on the same line
-
         Row(
-
           crossAxisAlignment: CrossAxisAlignment.center,
-
           children: [
-
             Semantics(
-
               label: 'Date Picker',
-
               hint: 'Select the transaction date',
-
               child: TextButton.icon(
-
                 onPressed: _pickDate,
-
                 icon: const Icon(Icons.calendar_today),
-
                 label: Text(_date.toLocal().toString().split(' ').first),
-
               ),
-
             ),
-
             const SizedBox(width: 12),
-
             Expanded(
-
               child: Semantics(
-
                 label: 'Transaction Description',
-
                 hint: 'Enter a description for the transaction',
-
                 child: TextField(
-
                   controller: _descriptionController,
-
                   decoration: const InputDecoration(
-
                     labelText: 'Description',
-
                     isDense: true,
-
                   ),
-
                 ),
-
               ),
-
             ),
-
           ],
-
         ),
-
         const SizedBox(height: 16),
 
-  
-
         // Use a flexible ListView for the transaction lines
-
         ListView.builder(
-
           shrinkWrap: true,
-
           physics: const NeverScrollableScrollPhysics(),
-
           itemCount: _lines.length,
-
           itemBuilder: (context, index) {
-
             final line = _lines[index];
-
             return Padding(
-
               padding: const EdgeInsets.symmetric(vertical: 8.0),
-
               // 4. Align Debit/Credit dropdown, amount, and delete icon with breadcrumbs
-
               child: Row(
-
                 crossAxisAlignment: CrossAxisAlignment.center,
-
                 children: [
-
                   Expanded(
-
                     child: AccountInput(
-
                       initialAccountId: line.accountId,
-
                       initialAccountPath: line.accountPath,
-
                       onAccountSelected: (id, childPath, rootName) {
-
                         setState(() {
-
                           line.accountId = id;
-
                           line.accountPath = childPath;
-
                           line.accountRoot = rootName;
-
                         });
-
                       },
-
                     ),
-
                   ),
-
                   const SizedBox(width: 12),
-
                   SizedBox(
-
                     width: 100,
-
                     child: DropdownButtonFormField<bool>(
-
                       initialValue: line.isDebit,
-
                       decoration: const InputDecoration(
-
                         isDense: true,
-
                         border: OutlineInputBorder(),
-
                         contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-
                       ),
-
                       items: const [
-
                         DropdownMenuItem(value: true, child: Text('Debit')),
-
                         DropdownMenuItem(value: false, child: Text('Credit')),
-
                       ],
-
                       onChanged: (v) {
-
                         if (v == null) return;
-
                         setState(() => line.isDebit = v);
-
                       },
-
                     ),
-
                   ),
-
                   const SizedBox(width: 8),
-
                   SizedBox(
-
                     width: 110,
-
                     child: TextField(
-
                       controller: line.amountController,
-
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
-
                       inputFormatters: _amountFormatters,
-
                       decoration: const InputDecoration(
-
                         hintText: '0.00',
-
                         isDense: true,
-
                         border: OutlineInputBorder(),
-
                         contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-
                       ),
-
                       onChanged: (_) => setState(() {}),
-
                     ),
-
                   ),
-
                   const SizedBox(width: 4),
-
                   Semantics(
-
                     label: 'Remove Line',
-
                     hint: 'Removes this transaction line',
-
                     child: IconButton(
-
                       icon: const Icon(Icons.delete, color: Colors.redAccent),
-
                       onPressed: () => _removeLine(index),
-
                       tooltip: 'Remove Line',
-
                       splashRadius: 20,
-
                     ),
-
                   ),
-
                 ],
-
               ),
-
             );
-
           },
-
         ),
-
-  
 
         const Divider(height: 20),
 
-  
-
         // 2 & 3. Grouped "Add Line", validator, and "Save Transaction" section
-
         _buildActionFooter(),
-
         const SizedBox(height: 24),
 
-        _buildTransactionHistory(),
+        // NEW: Recurring Payments Setup
+        _buildRecurringPaymentsSetup(),
+        const SizedBox(height: 24),
 
+        // NEW: Row for history and recurring payments
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 3, // Give more space to transaction history
+              child: _buildTransactionHistory(),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              flex: 2, // Give less space to recurring payments
+              child: _buildRecentRecurringPayments(),
+            ),
+          ],
+        ),
       ],
-
     );
-
   }
-
-  
 
   // Helper widget for the action footer
-
   Widget _buildActionFooter() {
-
     return Card(
-
       elevation: 4,
-
       margin: const EdgeInsets.all(0),
-
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-
       child: Padding(
-
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-
         child: Column(
-
           mainAxisSize: MainAxisSize.min,
-
           children: [
-
             Row(
-
               mainAxisAlignment: MainAxisAlignment.end,
-
               children: [
-
                 Text('Debits: ${totalDebits.toStringAsFixed(2)}',
-
                     style: const TextStyle(fontWeight: FontWeight.bold)),
-
                 const SizedBox(width: 20),
-
                 Text('Credits: ${totalCredits.toStringAsFixed(2)}',
-
                     style: const TextStyle(fontWeight: FontWeight.bold)),
-
                 const SizedBox(width: 12),
-
                 Semantics(
-
                   label: 'Balance Status',
-
                   hint: isBalanced ? 'Entries are balanced' : 'Entries are not balanced',
-
                   child: Tooltip(
-
                     message: isBalanced ? 'Entries are balanced' : 'Entries are not balanced',
-
                     child: Icon(
-
                       isBalanced ? Icons.check_circle : Icons.error,
-
                       color: isBalanced ? Colors.green.shade600 : Colors.red.shade600,
-
                     ),
-
                   ),
-
                 ),
-
               ],
-
             ),
-
             const SizedBox(height: 12),
-
             Row(
-
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-
               children: [
-
                 Semantics(
-
                   label: 'Add Line',
-
                   hint: 'Adds a new line to the transaction',
-
                   child: OutlinedButton.icon(
-
                     onPressed: _addLine,
-
                     icon: const Icon(Icons.add),
-
                     label: const Text('Add Line'),
-
                     style: OutlinedButton.styleFrom(
-
                       side: BorderSide(color: Theme.of(context).primaryColor),
-
                     ),
-
                   ),
-
                 ),
-
                 Semantics(
-
                   label: 'Save Transaction',
-
                   hint: 'Saves the current transaction',
-
                   child: ElevatedButton.icon(
-
                     onPressed: _submit,
-
                     icon: const Icon(Icons.save),
-
                     label: const Text('Save Transaction'),
-
                     style: ElevatedButton.styleFrom(
-
                       backgroundColor: Theme.of(context).primaryColor,
-
                       foregroundColor: Colors.white,
-
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-
                     ),
-
                   ),
-
                 ),
-
               ],
-
             ),
-
           ],
-
         ),
-
       ),
-
     );
-
   }
-
-  
 
   Widget _buildTransactionHistory() {
-
     return Card(
-
       elevation: 2,
-
       clipBehavior: Clip.antiAlias,
-
       child: Column(
-
         crossAxisAlignment: CrossAxisAlignment.stretch,
-
         children: [
-
           Padding(
-
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-
             child: Row(
-
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-
               children: [
-
                 Text(
-
                   'Recent Transactions',
-
                   style: Theme.of(context).textTheme.titleLarge,
-
                 ),
-
                 TextButton(
-
                   onPressed: () {
-
                     DefaultTabController.of(context).animateTo(2);
-
                   },
-
                   child: const Text('View All'),
-
                 ),
-
               ],
-
             ),
-
           ),
-
           if (_recentTransactions.isEmpty)
-
             const Padding(
-
               padding: EdgeInsets.all(16.0),
-
               child: Center(child: Text('No recent transactions.')),
-
             )
-
           else
-
             DataTable(
-
               columns: const [
-
                 DataColumn(label: Text('Date')),
-
                 DataColumn(label: Text('Description')),
-
                 DataColumn(label: Text('Amount'), numeric: true),
-
               ],
-
               rows: _recentTransactions.map((tx) {
-
                 final date = _formatDate(tx['date'] as String?);
-
                 final description = (tx['description'] as String?) ?? 'No description';
-
                 final lines = (tx['lines'] as List<dynamic>? ?? <dynamic>[]).cast<Map<String, dynamic>>();
-
                 double totalAmount = 0;
-
                 for (final l in lines) {
-
                   totalAmount += (l['debit'] as num?)?.toDouble() ?? 0.0;
-
                 }
 
-  
-
                 return DataRow(
-
                   cells: [
-
                     DataCell(Text(date)),
-
                     DataCell(
-
                       Tooltip(
-
                         message: description,
-
                         child: Text(
-
                           description,
-
                           overflow: TextOverflow.ellipsis,
-
                         ),
-
                       ),
-
                     ),
-
                     DataCell(Text(totalAmount.toStringAsFixed(2))),
-
                   ],
-
                 );
-
               }).toList(),
-
             ),
-
         ],
-
       ),
-
     );
-
   }
 
-}
 
-  
+  Widget _buildRecentRecurringPayments() {
+    return Card(
+      elevation: 2,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Text(
+              'Recurring Payments',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+          ),
+          if (_recentRecurringPayments.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Center(child: Text('No recurring payments saved.')),
+            )
+          else
+            FutureBuilder<List<Map<String, dynamic>>>(
+              future: _computedPaymentsFuture,
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+                final computedList = snapshot.data!;
+                return DataTable(
+                  columns: const [
+                    DataColumn(label: Text('Account')),
+                    DataColumn(label: Text('Amount'), numeric: true),
+                    DataColumn(label: Text('Interval')),
+                    DataColumn(label: Text('Next Date')),
+                    DataColumn(label: Text('Method')),
+                    DataColumn(label: Text('')), // For delete button
+                  ],
+                  rows: List.generate(computedList.length, (i) {
+                    final p = _recentRecurringPayments[i];
+                    final computed = computedList[i];
+                    final accountId = p['accountId'] as String;
+                    final amount = computed['calculatedAmount']?.toStringAsFixed(2) ?? '--';
+                    final interval = computed['intervalDays']?.toString() ?? '--';
+                    final nextOccurrence = _formatDate(computed['nextOccurrence'] as String?);
+                    final method = computed['method'] ?? '--';
+                    return DataRow(
+                      cells: [
+                        DataCell(Tooltip(message: accountId, child: Text(accountId, overflow: TextOverflow.ellipsis))),
+                        DataCell(Text(amount)),
+                        DataCell(Text(interval)),
+                        DataCell(Text(nextOccurrence)),
+                        DataCell(Chip(label: Text(method))),
+                        DataCell(
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                            onPressed: () => _deleteRecurringPayment(accountId),
+                            tooltip: 'Delete Recurring Payment',
+                            splashRadius: 20,
+                          ),
+                        ),
+                      ],
+                    );
+                  }),
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  // Define _deleteRecurringPayment if not present
+  Future<void> _deleteRecurringPayment(String accountPath) async {
+    try {
+      await _recurringApi.delete(accountPath);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Recurring payment deleted.')),
+      );
+      _loadRecentRecurringPayments();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete recurring payment: $e')),
+      );
+    }
+  }
+
+  // Ensure _formatDate is defined in _EditorScreenState
+  String _formatDate(String? iso) {
+    if (iso == null) return '';
+    try {
+      final dt = DateTime.parse(iso).toLocal();
+      return '${dt.year.toString().padLeft(4, "0")}-${dt.month.toString().padLeft(2, "0")}-${dt.day.toString().padLeft(2, "0")}';
+    } catch (_) {
+      return iso;
+    }
+  }
+}
 
 class _EntryLine {
 
@@ -1068,8 +877,6 @@ class _EntryLine {
 
 }
 
-  
-
 class ReportsScreen extends StatefulWidget {
 
   const ReportsScreen({super.key});
@@ -1081,8 +888,6 @@ class ReportsScreen extends StatefulWidget {
   State<ReportsScreen> createState() => _ReportsScreenState();
 
 }
-
-  
 
 class _ReportsScreenState extends State<ReportsScreen> {
 
@@ -1448,19 +1253,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
             mainAxisAlignment: MainAxisAlignment.end,
 
-            children: [
-
+                        children: [
               TextButton.icon(
-
                 onPressed: () => _toggleAll(!_expandAll),
-
                 icon: Icon(_expandAll ? Icons.unfold_less : Icons.unfold_more),
-
                 label: Text(_expandAll ? 'Collapse All' : 'Expand All'),
-
               ),
-
             ],
+
 
           ),
 
@@ -1792,18 +1592,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
         const SizedBox(width: 4), // Indent to align with icon
 
-        Icon(
-
-          isDebit ? Icons.arrow_downward : Icons.arrow_upward,
-
-          color: isDebit ? Colors.green.shade600 : Colors.red.shade600,
-
-          size: 18,
-
-        ),
-
-        const SizedBox(width: 8),
-
         Expanded(
 
           child: RichText(
@@ -1813,6 +1601,20 @@ class _ReportsScreenState extends State<ReportsScreen> {
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey.shade700),
 
               children: [
+
+
+                // Use a WidgetSpan with an Icon so icons render reliably instead
+                // of relying on font codepoints.
+                WidgetSpan(
+                  alignment: PlaceholderAlignment.middle,
+                  child: Icon(
+                    isDebit ? Icons.arrow_downward : Icons.arrow_upward,
+                    size: 18,
+                    color: isDebit ? Colors.green.shade600 : Colors.red.shade600,
+                  ),
+                ),
+
+                const WidgetSpan(child: SizedBox(width: 8)), // Spacing
 
                 for (int i = 0; i < pathParts.length; i++)
 
@@ -1875,8 +1677,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
 }
-
-  
 
 class TransactionTile extends StatelessWidget {
 
@@ -2015,8 +1815,6 @@ class TransactionTile extends StatelessWidget {
   }
 
 }
-
-  
   
 
 class SettingsScreen extends StatelessWidget {
@@ -2035,8 +1833,6 @@ class SettingsScreen extends StatelessWidget {
 
 }
 
-  
-
 // A data class for a segment in the account path breadcrumb
 
 class _PathSegment {
@@ -2048,8 +1844,6 @@ class _PathSegment {
   _PathSegment(this.id, this.name);
 
 }
-
-  
 
 class AccountInput extends StatefulWidget {
 
@@ -2080,8 +1874,6 @@ class AccountInput extends StatefulWidget {
   State<AccountInput> createState() => _AccountInputState();
 
 }
-
-  
 
 class _AccountInputState extends State<AccountInput> {
 
@@ -2115,19 +1907,17 @@ class _AccountInputState extends State<AccountInput> {
 
   
 
+  
   // Add icons for root accounts
-
   final Map<String, IconData> _rootIcons = {
-
     'Income': Icons.arrow_downward,
-
     'Expense': Icons.arrow_upward,
-
     'Assets': Icons.account_balance_wallet,
-
     'Liabilities': Icons.credit_card,
-
   };
+  
+  @override
+
 
   
 

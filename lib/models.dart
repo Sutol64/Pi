@@ -1,4 +1,3 @@
-
 class Account {
   final int? id;
   final String name;
@@ -101,54 +100,6 @@ class TransactionLine {
   }
 }
 
-class RecurringPayment {
-  final String id;
-  final String accountId;
-  final String rootCategory;
-  final String dates;
-  final double calculatedAmount;
-  final String nextOccurrence;
-  final String createdAt;
-  final String updatedAt;
-
-  RecurringPayment({
-    required this.id,
-    required this.accountId,
-    required this.rootCategory,
-    required this.dates,
-    required this.calculatedAmount,
-    required this.nextOccurrence,
-    required this.createdAt,
-    required this.updatedAt,
-  });
-
-  Map<String, dynamic> toMap() {
-    return {
-      'id': id,
-      'accountId': accountId,
-      'rootCategory': rootCategory,
-      'dates': dates,
-      'calculatedAmount': calculatedAmount,
-      'nextOccurrence': nextOccurrence,
-      'createdAt': createdAt,
-      'updatedAt': updatedAt,
-    };
-  }
-
-  factory RecurringPayment.fromMap(Map<String, dynamic> map) {
-    return RecurringPayment(
-      id: map['id'],
-      accountId: map['accountId'],
-      rootCategory: map['rootCategory'],
-      dates: map['dates'],
-      calculatedAmount: map['calculatedAmount'],
-      nextOccurrence: map['nextOccurrence'],
-      createdAt: map['createdAt'],
-      updatedAt: map['updatedAt'],
-    );
-  }
-}
-
 class Budget {
   final int? id;
   final String type;
@@ -212,3 +163,4 @@ enum RootCategory {
     }
   }
 }
+
