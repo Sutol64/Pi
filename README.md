@@ -1,6 +1,6 @@
 # personal_finance_app_00
 
-A new Flutter project.
+Your go to Personal Finance App
 
 ## Getting Started
 
