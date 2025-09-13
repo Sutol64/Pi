@@ -44,4 +44,10 @@ class RecurringPaymentApi {
     await service.delete(accountPath);
     return jsonEncode({'deleted': true});
   }
+
+  /// Example: Fetch all recurring payments
+  Future<String> fetchAll() async {
+    final result = await service.fetchAll();
+    return jsonEncode(result);
+  }
 }

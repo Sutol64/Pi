@@ -1,0 +1,1 @@
+enum ReportsView { transactions, recurring }

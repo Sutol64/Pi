@@ -33,6 +33,11 @@ class RecurringPaymentService {
     return await dbHelper.getRecentRecurringPayments(limit: limit);
   }
 
+  /// Fetch all recurring payments
+  Future<List<Map<String, dynamic>>> fetchAll() async {
+    return await dbHelper.getAllRecurringPayments();
+  }
+
   /// Delete a recurring payment
   Future<void> delete(String accountPath) async {
     await dbHelper.deleteRecurringPayment(accountPath);

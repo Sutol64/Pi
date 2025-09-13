@@ -634,6 +634,15 @@ class DatabaseHelper {
     );
   }
 
+  /// Fetches all recurring payments.
+  Future<List<Map<String, dynamic>>> getAllRecurringPayments() async {
+    final db = await database;
+    return await db.query(
+      'recurring_payments',
+      orderBy: 'updatedAt DESC',
+    );
+  }
+
   Future<void> close() async {
     final db = _database;
     if (db != null) {

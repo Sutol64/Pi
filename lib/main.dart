@@ -10,6 +10,11 @@ import 'recurring_payment_service.dart';
 import 'package:provider/provider.dart';
 import 'widgets/recurring_payment_form.dart';
 
+// New imports
+import 'package:personal_finance_app_00/reports_screen.dart';
+import 'package:personal_finance_app_00/widgets/transaction_tile.dart';
+import 'package:personal_finance_app_00/reports_view_enum.dart'; // Import ReportsView enum
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
@@ -26,7 +31,6 @@ class MyApp extends StatelessWidget {
 
   const MyApp({super.key}); // added key
 
-  
 
   @override
 
@@ -42,7 +46,7 @@ class MyApp extends StatelessWidget {
       ),
 
       home: const HomeScreen(),
-
+      // Removed the /reports route definition
     );
 
   }
@@ -53,7 +57,6 @@ class HomeScreen extends StatelessWidget {
 
   const HomeScreen({super.key}); // added key
 
-  
 
   @override
 
@@ -97,7 +100,7 @@ class HomeScreen extends StatelessWidget {
 
             EditorScreen(),
 
-            ReportsScreen(),
+            ReportsScreen(key: reportsScreenKey), // Pass the GlobalKey here
 
             SettingsScreen(),
 
@@ -117,7 +120,6 @@ class DashboardScreen extends StatelessWidget {
 
   const DashboardScreen({super.key});
 
-  
 
   @override
 
@@ -132,7 +134,6 @@ class EditorScreen extends StatefulWidget {
 
   const EditorScreen({super.key});
 
-  
 
   @override
 
@@ -161,7 +162,7 @@ class _EditorScreenState extends State<EditorScreen>
 
   // allow digits, comma and dot (basic); parsing strips commas
   static final List<TextInputFormatter> _amountFormatters = [
-    FilteringTextInputFormatter.allow(RegExp(r'[\d\.,]')),
+    FilteringTextInputFormatter.allow(RegExp(r'[\d\.,]')), // Corrected regex escaping
   ];
 
   // Add API and service instances
@@ -242,7 +243,7 @@ class _EditorScreenState extends State<EditorScreen>
 
   void _addLine() {
     setState(() {
-      _lines.add(_EntryLine(accountPath: 'Cash', isDebit: true));
+      _lines.add(_EntryLine(accountPath: 'Assets', isDebit: true));
     });
   }
 
@@ -387,7 +388,7 @@ class _EditorScreenState extends State<EditorScreen>
       
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Recurring payment saved successfully!')),
+        const SnackBar(content: Text('Recurring payment saved successfully!'))
       );
       
       print('Loading recent recurring payments after save...');
@@ -754,15 +755,31 @@ class _EditorScreenState extends State<EditorScreen>
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Text(
-              'Recurring Payments',
-              style: Theme.of(context).textTheme.titleLarge,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Recurring Payments',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                TextButton(
+                  onPressed: () {
+                    // Get the TabController
+                    final TabController tabController = DefaultTabController.of(context);
+                    // Animate to the Reports tab (index 2)
+                    tabController.animateTo(2);
+                    // Select the Recurring view in ReportsScreen
+                    reportsScreenKey.currentState?.selectView(ReportsView.recurring);
+                  },
+                  child: const Text('View All'),
+                ),
+              ],
             ),
           ),
           if (_recentRecurringPayments.isEmpty)
             const Padding(
               padding: EdgeInsets.all(16.0),
-              child: Center(child: Text('No recurring payments saved.')),
+              child: Center(child: Text('No recent recurring payments saved.')),
             )
           else
             FutureBuilder<List<Map<String, dynamic>>>(
@@ -840,7 +857,7 @@ class _EditorScreenState extends State<EditorScreen>
     if (iso == null) return '';
     try {
       final dt = DateTime.parse(iso).toLocal();
-      return '${dt.year.toString().padLeft(4, "0")}-${dt.month.toString().padLeft(2, "0")}-${dt.day.toString().padLeft(2, "0")}';
+      return '${dt.year.toString().padLeft(4, "0")}-${dt.month.toString().padLeft(2, "0")}-${dt.day.toString().padLeft(2, "0")}' ;
     } catch (_) {
       return iso;
     }
@@ -877,946 +894,6 @@ class _EntryLine {
 
 }
 
-class ReportsScreen extends StatefulWidget {
-
-  const ReportsScreen({super.key});
-
-  
-
-  @override
-
-  State<ReportsScreen> createState() => _ReportsScreenState();
-
-}
-
-class _ReportsScreenState extends State<ReportsScreen> {
-
-  late Future<List<Map<String, dynamic>>> _futureTxs;
-
-  Map<int, Map<int, List<Map<String, dynamic>>>> _groupedTransactions = {};
-
-  Map<int, bool> _isYearExpanded = {};
-
-  Map<String, bool> _isMonthExpanded = {}; // Key: "year-month"
-
-  Map<int, bool> _isTransactionExpanded = {}; // Key: transactionId
-
-  bool _expandAll = false;
-
-  
-
-  // Use a scheduler-aware setter to avoid calling setState during the build phase.
-
-  void _safeSetState(VoidCallback fn) {
-
-    if (!mounted) return;
-
-    final phase = SchedulerBinding.instance.schedulerPhase;
-
-    // If we're currently in the build/layout/painting phases, defer to next frame.
-
-    if (phase == SchedulerPhase.idle || phase == SchedulerPhase.postFrameCallbacks) {
-
-      setState(fn);
-
-    } else {
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-
-        if (!mounted) return;
-
-        setState(fn);
-
-      });
-
-    }
-
-  }
-
-  
-
-  @override
-
-  void initState() {
-
-    super.initState();
-
-    _load();
-
-  }
-
-  
-
-  void _load() {
-
-    _futureTxs = DatabaseHelper.instance.fetchAllTransactions();
-
-    _futureTxs.then((txs) {
-
-      if (!mounted) return;
-
-      _groupTransactions(txs);
-
-    });
-
-  }
-
-  
-
-  void _groupTransactions(List<Map<String, dynamic>> txs) {
-
-    final grouped = <int, Map<int, List<Map<String, dynamic>>>>{};
-
-    final newYearExpanded = <int, bool>{};
-
-    final newMonthExpanded = <String, bool>{};
-
-    final newTransactionExpanded = <int, bool>{};
-
-  
-
-    for (final tx in txs) {
-
-      final date = DateTime.parse(tx['date'] as String);
-
-      final year = date.year;
-
-      final month = date.month;
-
-      final monthKey = "$year-$month";
-
-      final txId = tx['id'] as int;
-
-  
-
-      grouped.putIfAbsent(year, () => {}).putIfAbsent(month, () => []).add(tx);
-
-  
-
-      // preserve previous explicit choices, otherwise respect global _expandAll
-
-      newYearExpanded.putIfAbsent(year, () => _isYearExpanded[year] ?? _expandAll);
-
-      newMonthExpanded.putIfAbsent(monthKey, () => _isMonthExpanded[monthKey] ?? _expandAll);
-
-      newTransactionExpanded.putIfAbsent(txId, () => _isTransactionExpanded[txId] ?? _expandAll);
-
-    }
-
-  
-
-    _safeSetState(() {
-
-      _groupedTransactions = grouped;
-
-      _isYearExpanded = newYearExpanded;
-
-      _isMonthExpanded = newMonthExpanded;
-
-      _isTransactionExpanded = newTransactionExpanded;
-
-    });
-
-  }
-
-  
-
-  Future<void> _refresh() async {
-
-    _load();
-
-    await _futureTxs;
-
-    if (mounted) _safeSetState(() {});
-
-  }
-
-  
-
-  String _formatDate(String? iso) {
-
-    if (iso == null) return '';
-
-    try {
-
-      final dt = DateTime.parse(iso).toLocal();
-
-      return '${dt.year.toString().padLeft(4, "0")}-${dt.month.toString().padLeft(2, "0")}-${dt.day.toString().padLeft(2, "0")}';
-
-    } catch (_) {
-
-      return iso;
-
-    }
-
-  }
-
-  
-
-  // Set expansion state for all known year/month/tx keys.
-
-  void _toggleAll(bool expand) {
-
-    _safeSetState(() {
-
-      _expandAll = expand;
-
-      // Ensure every year key exists and set it
-
-      final newYear = <int, bool>{};
-
-      for (final y in _groupedTransactions.keys) {
-
-        newYear[y] = expand;
-
-      }
-
-      _isYearExpanded = newYear;
-
-  
-
-      // Build month keys from grouped transactions and set them
-
-      final newMonth = <String, bool>{};
-
-      _groupedTransactions.forEach((y, months) {
-
-        months.forEach((m, txs) {
-
-          newMonth['$y-$m'] = expand;
-
-        });
-
-      });
-
-      _isMonthExpanded = newMonth;
-
-  
-
-      // Set transaction expansion flags
-
-      final newTx = <int, bool>{};
-
-      _groupedTransactions.forEach((_, months) {
-
-        months.forEach((_, txs) {
-
-          for (final tx in txs) {
-
-            final id = tx['id'] as int;
-
-            newTx[id] = expand;
-
-          }
-
-        });
-
-      });
-
-      _isTransactionExpanded = newTx;
-
-    });
-
-  }
-
-  
-
-  void _toggleYear(int year, bool expand) {
-
-    _safeSetState(() {
-
-      _isYearExpanded[year] = expand;
-
-      // Affect all months in that year
-
-      _groupedTransactions[year]?.keys.forEach((month) {
-
-        _isMonthExpanded['$year-$month'] = expand;
-
-        // Also affect transactions in those months
-
-        _groupedTransactions[year]?[month]?.forEach((tx) {
-
-          final id = tx['id'] as int;
-
-          _isTransactionExpanded[id] = expand;
-
-        });
-
-      });
-
-    });
-
-  }
-
-  
-
-  void _toggleAllMonthsInYear(int year, bool expand) {
-
-    _safeSetState(() {
-
-      _groupedTransactions[year]?.keys.forEach((month) {
-
-        final monthKey = "$year-$month";
-
-        _isMonthExpanded[monthKey] = expand;
-
-        _groupedTransactions[year]?[month]?.forEach((tx) {
-
-          final id = tx['id'] as int;
-
-          _isTransactionExpanded[id] = expand;
-
-        });
-
-      });
-
-    });
-
-  }
-
-  
-
-  void _toggleMonth(String monthKey, bool expand) {
-
-    _safeSetState(() {
-
-      _isMonthExpanded[monthKey] = expand;
-
-      final parts = monthKey.split('-');
-
-      if (parts.length == 2) {
-
-        final y = int.tryParse(parts[0]);
-
-        final m = int.tryParse(parts[1]);
-
-        if (y != null && m != null) {
-
-          _groupedTransactions[y]?[m]?.forEach((tx) {
-
-            final id = tx['id'] as int;
-
-            _isTransactionExpanded[id] = expand;
-
-          });
-
-        }
-
-      }
-
-    });
-
-  }
-
-  
-
-  void _toggleAllTransactionsInMonth(int year, int month, bool expand) {
-
-    _safeSetState(() {
-
-      _groupedTransactions[year]?[month]?.forEach((tx) {
-
-        final txId = tx['id'] as int;
-
-        _isTransactionExpanded[txId] = expand;
-
-      });
-
-    });
-
-  }
-
-  
-
-  void _toggleTransaction(int txId, bool expand) {
-
-    _safeSetState(() => _isTransactionExpanded[txId] = expand);
-
-  }
-
-  
-
-  @override
-
-  Widget build(BuildContext context) {
-
-    return Column(
-
-      children: [
-
-        Padding(
-
-          padding: const EdgeInsets.all(8.0),
-
-          child: Row(
-
-            mainAxisAlignment: MainAxisAlignment.end,
-
-                        children: [
-              TextButton.icon(
-                onPressed: () => _toggleAll(!_expandAll),
-                icon: Icon(_expandAll ? Icons.unfold_less : Icons.unfold_more),
-                label: Text(_expandAll ? 'Collapse All' : 'Expand All'),
-              ),
-            ],
-
-
-          ),
-
-        ),
-
-        Expanded(
-
-          child: FutureBuilder<List<Map<String, dynamic>>>(
-
-            future: _futureTxs,
-
-            builder: (context, snapshot) {
-
-              if (snapshot.connectionState == ConnectionState.waiting && _groupedTransactions.isEmpty) {
-
-                return const Center(child: CircularProgressIndicator());
-
-              }
-
-              if (snapshot.hasError) {
-
-                return Center(
-
-                  child: Column(
-
-                    mainAxisSize: MainAxisSize.min,
-
-                    children: [
-
-                      Text('Failed to load transactions: ${snapshot.error}'),
-
-                      const SizedBox(height: 12),
-
-                      ElevatedButton(onPressed: _refresh, child: const Text('Retry')),
-
-                    ],
-
-                  ),
-
-                );
-
-              }
-
-  
-
-              final txs = snapshot.data ?? [];
-
-              if (txs.isEmpty) {
-
-                return RefreshIndicator(
-
-                  onRefresh: _refresh,
-
-                  child: ListView(
-
-                    physics: const AlwaysScrollableScrollPhysics(),
-
-                    children: const [
-
-                      SizedBox(height: 200),
-
-                      Center(child: Text('No transactions found')),
-
-                    ],
-
-                  ),
-
-                );
-
-              }
-
-  
-
-              final years = _groupedTransactions.keys.toList()..sort((a, b) => b.compareTo(a));
-
-  
-
-              return RefreshIndicator(
-
-                onRefresh: _refresh,
-
-                child: ListView.builder(
-
-                  padding: const EdgeInsets.all(12),
-
-                  itemCount: years.length,
-
-                  itemBuilder: (context, yearIndex) {
-
-                    final year = years[yearIndex];
-
-                    final monthsData = _groupedTransactions[year]!;
-
-                    final months = monthsData.keys.toList()..sort((a, b) => b.compareTo(a));
-
-                    final isYearCurrentlyExpanded = _isYearExpanded[year] ?? false;
-
-  
-
-                    double yearTotal = 0;
-
-                    for (var txs in monthsData.values) {
-
-                      for (var tx in txs) {
-
-                        final lines = (tx['lines'] as List<dynamic>? ?? <dynamic>[]).cast<Map<String, dynamic>>();
-
-                        for (final l in lines) {
-
-                          yearTotal += (l['debit'] as num?)?.toDouble() ?? 0.0;
-
-                        }
-
-                      }
-
-                    }
-
-  
-
-                    // NEW: compute month-level aggregate expansion for this year
-
-                    final areMonthsExpanded = months.every((m) => _isMonthExpanded['$year-$m'] ?? false);
-
-  
-
-                    return Card(
-
-                      elevation: 2,
-
-                      margin: const EdgeInsets.symmetric(vertical: 8),
-
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-
-                      clipBehavior: Clip.antiAlias,
-
-                      child: ExpansionTile(
-
-                        // include expansion state in the key so the tile rebuilds when it changes
-
-                        key: ValueKey('year_${year}_$isYearCurrentlyExpanded'),
-
-                        title: Row(
-
-                          children: [
-
-                            Expanded(
-
-                              child: Text('$year Total: ${yearTotal.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-
-                            ),
-
-                            TextButton(
-
-                              // Toggle based on the months' actual expansion state (not the year tile state)
-
-                              onPressed: () => _toggleAllMonthsInYear(year, !areMonthsExpanded),
-
-                              child: Text(areMonthsExpanded ? 'Collapse Months' : 'Expand Months'),
-
-                            ),
-
-                          ],
-
-                        ),
-
-                        initiallyExpanded: isYearCurrentlyExpanded,
-
-                        onExpansionChanged: (expanded) => _toggleYear(year, expanded),
-
-                        children: months.map((month) {
-
-                          final txsInMonth = monthsData[month]!;
-
-                          final monthKey = "$year-$month";
-
-                          final monthNames = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-
-                          final isMonthCurrentlyExpanded = _isMonthExpanded[monthKey] ?? false;
-
-  
-
-                          double monthTotal = 0;
-
-                          for (var tx in txsInMonth) {
-
-                            final lines = (tx['lines'] as List<dynamic>? ?? <dynamic>[]).cast<Map<String, dynamic>>();
-
-                            for (final l in lines) {
-
-                              monthTotal += (l['debit'] as num?)?.toDouble() ?? 0.0;
-
-                            }
-
-                          }
-
-  
-
-                          // NEW: compute whether ALL transactions in this month are expanded
-
-                          final areTxsExpanded = txsInMonth.every((tx) {
-
-                            final id = tx['id'] as int;
-
-                            return _isTransactionExpanded[id] ?? false;
-
-                          });
-
-  
-
-                          return Padding(
-
-                            padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 8.0),
-
-                            child: ExpansionTile(
-
-                              // include expansion in key to force rebuild when state changes
-
-                              key: ValueKey('month_${monthKey}_$isMonthCurrentlyExpanded'),
-
-                              title: Row(
-
-                                children: [
-
-                                  Expanded(child: Text('${monthNames[month]} Total: ${monthTotal.toStringAsFixed(2)}')),
-
-                                  TextButton(
-
-                                    // Toggle transactions based on their actual expansion state, not the month tile expanded flag.
-
-                                    onPressed: () => _toggleAllTransactionsInMonth(year, month, !areTxsExpanded),
-
-                                    child: Text(areTxsExpanded ? 'Collapse Txs' : 'Expand Txs'),
-
-                                  ),
-
-                                ],
-
-                              ),
-
-                              initiallyExpanded: isMonthCurrentlyExpanded,
-
-                              onExpansionChanged: (expanded) => _toggleMonth(monthKey, expanded),
-
-                              children: txsInMonth.map((tx) {
-
-                                final txId = tx['id'] as int;
-
-                                final isTxExpanded = _isTransactionExpanded[txId] ?? false;
-
-                                return TransactionTile(
-
-                                  // include expansion state in the key so child rebuilds with the new initiallyExpanded
-
-                                  key: ValueKey('tx_${txId}_$isTxExpanded'),
-
-                                  tx: tx,
-
-                                  isExpanded: isTxExpanded,
-
-                                  onExpansionChanged: (expanded) {
-
-                                    _toggleTransaction(txId, expanded);
-
-                                  },
-
-                                  buildTransactionLine: _buildTransactionLine,
-
-                                  formatDate: _formatDate,
-
-                                );
-
-                              }).toList(),
-
-                            ),
-
-                          );
-
-                        }).toList(),
-
-                      ),
-
-                    );
-
-                  },
-
-                ),
-
-              );
-
-            },
-
-          ),
-
-        ),
-
-      ],
-
-    );
-
-  }
-
-  
-
-  Widget _buildTransactionLine(BuildContext context, Map<String, dynamic> line) {
-
-    final accountPath = (line['account'] as String?) ?? 'No Account';
-
-    final debit = (line['debit'] as num?)?.toDouble() ?? 0.0;
-
-    final credit = (line['credit'] as num?)?.toDouble() ?? 0.0;
-
-    final isDebit = debit > 0.0;
-
-    final amount = isDebit ? debit : credit;
-
-    final amountText = amount.toStringAsFixed(2);
-
-  
-
-    final pathParts = accountPath.split(':');
-
-  
-
-    return Row(
-
-      crossAxisAlignment: CrossAxisAlignment.center,
-
-      children: [
-
-        const SizedBox(width: 4), // Indent to align with icon
-
-        Expanded(
-
-          child: RichText(
-
-            text: TextSpan(
-
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey.shade700),
-
-              children: [
-
-
-                // Use a WidgetSpan with an Icon so icons render reliably instead
-                // of relying on font codepoints.
-                WidgetSpan(
-                  alignment: PlaceholderAlignment.middle,
-                  child: Icon(
-                    isDebit ? Icons.arrow_downward : Icons.arrow_upward,
-                    size: 18,
-                    color: isDebit ? Colors.green.shade600 : Colors.red.shade600,
-                  ),
-                ),
-
-                const WidgetSpan(child: SizedBox(width: 8)), // Spacing
-
-                for (int i = 0; i < pathParts.length; i++)
-
-                  TextSpan(
-
-                    text: i == pathParts.length - 1 ? pathParts[i] : '${pathParts[i]} > ',
-
-                    style: TextStyle(
-
-                      fontWeight: i == pathParts.length - 1 ? FontWeight.bold : FontWeight.normal,
-
-                      color: i == pathParts.length - 1
-
-                          ? (Theme.of(context).textTheme.bodyMedium?.color)
-
-                          : Colors.grey.shade600,
-
-                    ),
-
-                  ),
-
-              ],
-
-            ),
-
-            overflow: TextOverflow.ellipsis,
-
-          ),
-
-        ),
-
-        const SizedBox(width: 12),
-
-        SizedBox(
-
-          width: 90,
-
-          child: Text(
-
-            '${isDebit ? 'Dr' : 'Cr'} $amountText',
-
-            textAlign: TextAlign.right,
-
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-
-                  fontWeight: FontWeight.w500,
-
-                  color: isDebit ? Colors.green.shade700 : Colors.red.shade700,
-
-                ),
-
-          ),
-
-        ),
-
-      ],
-
-    );
-
-  }
-
-}
-
-class TransactionTile extends StatelessWidget {
-
-  final Map<String, dynamic> tx;
-
-  final bool isExpanded;
-
-  final ValueChanged<bool> onExpansionChanged;
-
-  final Widget Function(BuildContext, Map<String, dynamic>) buildTransactionLine;
-
-  final String Function(String?) formatDate;
-
-  
-
-  const TransactionTile({
-
-    super.key,
-
-    required this.tx,
-
-    required this.isExpanded,
-
-    required this.onExpansionChanged,
-
-    required this.buildTransactionLine,
-
-    required this.formatDate,
-
-  });
-
-  
-
-  @override
-
-  Widget build(BuildContext context) {
-
-    final id = tx['id']?.toString() ?? '';
-
-    final date = formatDate(tx['date'] as String?);
-
-    final description = (tx['description'] as String?) ?? 'No description';
-
-    final lines = (tx['lines'] as List<dynamic>? ?? <dynamic>[]).cast<Map<String, dynamic>>();
-
-  
-
-    double totalAmount = 0;
-
-    for (final l in lines) {
-
-      totalAmount += (l['debit'] as num?)?.toDouble() ?? 0.0;
-
-    }
-
-  
-
-    return Card(
-
-      elevation: 2,
-
-      margin: const EdgeInsets.symmetric(vertical: 8),
-
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-
-      clipBehavior: Clip.antiAlias,
-
-      child: ExpansionTile(
-
-        backgroundColor: Theme.of(context).colorScheme.primary.withAlpha((255 * 0.04).round()),
-
-        initiallyExpanded: isExpanded,
-
-        onExpansionChanged: onExpansionChanged,
-
-        title: Semantics(
-
-          label: 'Transaction Description: $description',
-
-          hint: 'Total amount: ${totalAmount.toStringAsFixed(2)}',
-
-          child: Text(
-
-            '$description - ${totalAmount.toStringAsFixed(2)}',
-
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-
-            maxLines: 2,
-
-            overflow: TextOverflow.ellipsis,
-
-          ),
-
-        ),
-
-        subtitle: Semantics(
-
-          label: 'Transaction Date: $date',
-
-          hint: 'Transaction ID: $id',
-
-          child: Text(
-
-            '$date • ID: $id',
-
-            style: Theme.of(context).textTheme.bodySmall,
-
-          ),
-
-        ),
-
-        childrenPadding: const EdgeInsets.only(bottom: 8, left: 16, right: 16),
-
-        children: [
-
-          const Divider(height: 1),
-
-          const SizedBox(height: 8),
-
-          for (final l in lines)
-
-            Padding(
-
-              padding: const EdgeInsets.symmetric(vertical: 4.0),
-
-              child: buildTransactionLine(context, l),
-
-            ),
-
-        ],
-
-      ),
-
-    );
-
-  }
-
-}
-  
-
 class SettingsScreen extends StatelessWidget {
 
   const SettingsScreen({super.key});
@@ -1834,7 +911,6 @@ class SettingsScreen extends StatelessWidget {
 }
 
 // A data class for a segment in the account path breadcrumb
-
 class _PathSegment {
 
   final int id;
@@ -1917,7 +993,6 @@ class _AccountInputState extends State<AccountInput> {
   };
   
   @override
-
 
   
 
@@ -2351,7 +1426,7 @@ class _AccountInputState extends State<AccountInput> {
 
               borderRadius: BorderRadius.circular(8),
 
-            ),
+              ),
 
             child: Icon(Icons.add, color: Theme.of(context).primaryColor, size: 18),
 
@@ -2425,7 +1500,7 @@ class _AccountInputState extends State<AccountInput> {
 
                             Icon(_rootIcons[n], size: 18, color: Colors.grey.shade700),
 
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 8), // Spacing
 
                             Text(n),
 
