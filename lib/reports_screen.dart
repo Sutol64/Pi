@@ -18,7 +18,7 @@ class ReportsScreen extends StatefulWidget {
 
 class _ReportsScreenState extends State<ReportsScreen> {
   ReportsView _currentView = ReportsView.transactions;
-  bool _expandAll = false; // New state for expand/collapse all
+  bool _expandAll = true; // New state for expand/collapse all
 
   @override
   void initState() {
@@ -35,14 +35,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
   void selectView(ReportsView newView) {
     setState(() {
       _currentView = newView;
-      _expandAll = false; // Reset expand/collapse state when view changes
+      _expandAll = true; // Reset expand/collapse state when view changes
     });
   }
 
   void _onViewChanged(ReportsView newView) {
     setState(() {
       _currentView = newView;
-      _expandAll = false; // Reset expand/collapse state when view changes
+      _expandAll = true; // Reset expand/collapse state when view changes
     });
   }
 

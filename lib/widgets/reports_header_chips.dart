@@ -13,70 +13,45 @@ class ReportsHeaderChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      label: 'Reports View Selector',
-      child: Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(8.0),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildChip(
-              context,
-              label: 'Transactions',
-              view: ReportsView.transactions,
-              isSelected: currentView == ReportsView.transactions,
-            ),
-            _buildChip(
-              context,
-              label: 'Recurring',
-              view: ReportsView.recurring,
-              isSelected: currentView == ReportsView.recurring,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildChip(
-    BuildContext context,
-    {required String label,
-    required ReportsView view,
-    required bool isSelected,}
-  ) {
-    return Flexible( // Changed from Expanded to Flexible
-      fit: FlexFit.tight, // Added FlexFit.tight
-      child: GestureDetector(
-        onTap: () => onViewChanged(view),
-        child: Semantics(
-          label: label,
-          selected: isSelected,
-          button: true,
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-            decoration: BoxDecoration(
-              color: isSelected
-                  ? Theme.of(context).colorScheme.primary
-                  : Colors.transparent,
-              borderRadius: BorderRadius.circular(8.0),
-            ),
-            child: Center(
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: isSelected
-                      ? Theme.of(context).colorScheme.onPrimary
-                      : Theme.of(context).colorScheme.onSurface,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.start,
+      children: <Widget>[
+        ChoiceChip(
+          label: const Text('Transactions'),
+          selected: currentView == ReportsView.transactions,
+          onSelected: (bool selected) {
+            if (selected) {
+              onViewChanged(ReportsView.transactions);
+            }
+          },
+          labelStyle: TextStyle(
+            color: currentView == ReportsView.transactions
+                ? Theme.of(context).colorScheme.onPrimary
+                : Theme.of(context).colorScheme.onSurface,
           ),
+          selectedColor: Theme.of(context).colorScheme.primary,
+          backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+          showCheckmark: false,
         ),
-      ),
+        const SizedBox(width: 8),
+        ChoiceChip(
+          label: const Text('Recurring'),
+          selected: currentView == ReportsView.recurring,
+          onSelected: (bool selected) {
+            if (selected) {
+              onViewChanged(ReportsView.recurring);
+            }
+          },
+          labelStyle: TextStyle(
+            color: currentView == ReportsView.recurring
+                ? Theme.of(context).colorScheme.onPrimary
+                : Theme.of(context).colorScheme.onSurface,
+          ),
+          selectedColor: Theme.of(context).colorScheme.primary,
+          backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+          showCheckmark: false,
+        ),
+      ],
     );
   }
 }
