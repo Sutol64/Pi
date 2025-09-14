@@ -271,7 +271,7 @@ class _TransactionsPanelState extends State<TransactionsPanel> {
                             TextButton(
                               // Toggle based on the months' actual expansion state (not the year tile state)
                               onPressed: () => _toggleAllMonthsInYear(year, !areMonthsExpanded),
-                              child: Text(areMonthsExpanded ? 'Collapse Months' : 'Expand Months'),
+                              child: Text(areMonthsExpanded ? 'Collapse' : 'Expand'),
                             ),
                           ],
                         ),
@@ -308,7 +308,7 @@ class _TransactionsPanelState extends State<TransactionsPanel> {
                                   TextButton(
                                     // Toggle transactions based on their actual expansion state, not the month tile expanded flag.
                                     onPressed: () => _toggleAllTransactionsInMonth(year, month, !areTxsExpanded),
-                                    child: Text(areTxsExpanded ? 'Collapse Txs' : 'Expand Txs'),
+                                    child: Text(areTxsExpanded ? 'Collapse' : 'Expand'),
                                   ),
                                 ],
                               ),
