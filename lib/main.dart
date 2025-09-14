@@ -401,44 +401,47 @@ class _EditorScreenState extends State<EditorScreen>
     }
   }
 
-  // Remove amount/date inputs from recurring payment form UI
-  Widget _buildRecurringPaymentsSetup() {
-    return Card(
-      elevation: 2,
-      margin: const EdgeInsets.symmetric(vertical: 8.0),
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Setup Recurring Payment', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 16),
-            AccountInput(
-              onAccountSelected: (id, childPath, rootName) {
-                setState(() {
-                  _recurringAccountId = id;
-                  _recurringAccountRoot = rootName;
-                });
-              },
+  Widget _buildResponsiveEntryFields(_EntryLine line) {
+    return Wrap(
+      spacing: 8.0,
+      runSpacing: 8.0,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        SizedBox(
+          width: 100,
+          child: DropdownButtonFormField<bool>(
+            value: line.isDebit,
+            decoration: const InputDecoration(
+              isDense: true,
+              border: OutlineInputBorder(),
+              contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
             ),
-            const SizedBox(height: 16),
-            Align(
-              alignment: Alignment.centerRight,
-              child: ElevatedButton.icon(
-                onPressed: _setupRecurringPayment,
-                icon: const Icon(Icons.save_alt),
-                label: const Text('Save Recurring'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.secondary,
-                  foregroundColor: Theme.of(context).colorScheme.onSecondary,
-                ),
-              ),
-            ),
-          ],
+            items: const [
+              DropdownMenuItem(value: true, child: Text('Debit')),
+              DropdownMenuItem(value: false, child: Text('Credit')),
+            ],
+            onChanged: (v) {
+              if (v == null) return;
+              setState(() => line.isDebit = v);
+            },
+          ),
         ),
-      ),
+        SizedBox(
+          width: 110,
+          child: TextField(
+            controller: line.amountController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: _amountFormatters,
+            decoration: const InputDecoration(
+              hintText: '0.00',
+              isDense: true,
+              border: OutlineInputBorder(),
+              contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+        ),
+      ],
     );
   }
 
@@ -520,41 +523,7 @@ class _EditorScreenState extends State<EditorScreen>
                     ),
                   ),
                   const SizedBox(width: 12),
-                  SizedBox(
-                    width: 100,
-                    child: DropdownButtonFormField<bool>(
-                      initialValue: line.isDebit,
-                      decoration: const InputDecoration(
-                        isDense: true,
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: true, child: Text('Debit')),
-                        DropdownMenuItem(value: false, child: Text('Credit')),
-                      ],
-                      onChanged: (v) {
-                        if (v == null) return;
-                        setState(() => line.isDebit = v);
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  SizedBox(
-                    width: 110,
-                    child: TextField(
-                      controller: line.amountController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: _amountFormatters,
-                      decoration: const InputDecoration(
-                        hintText: '0.00',
-                        isDense: true,
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                      ),
-                      onChanged: (_) => setState(() {}),
-                    ),
-                  ),
+                  _buildResponsiveEntryFields(line),
                   const SizedBox(width: 4),
                   Semantics(
                     label: 'Remove Line',
@@ -591,12 +560,10 @@ class _EditorScreenState extends State<EditorScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
-                    flex: 3, // Give more space to transaction history
                     child: _buildTransactionHistory(),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
-                    flex: 2, // Give less space to recurring payments
                     child: _buildRecentRecurringPayments(),
                   ),
                 ],
@@ -629,15 +596,15 @@ class _EditorScreenState extends State<EditorScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 12.0,
+              runSpacing: 8.0,
               children: [
                 Text('Debits: ${totalDebits.toStringAsFixed(2)}',
                     style: const TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(width: 20),
                 Text('Credits: ${totalCredits.toStringAsFixed(2)}',
                     style: const TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(width: 12),
                 Semantics(
                   label: 'Balance Status',
                   hint: isBalanced ? 'Entries are balanced' : 'Entries are not balanced',
@@ -652,8 +619,10 @@ class _EditorScreenState extends State<EditorScreen>
               ],
             ),
             const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              spacing: 8.0,
+              runSpacing: 8.0,
               children: [
                 Semantics(
                   label: 'Add Line',
@@ -680,6 +649,49 @@ class _EditorScreenState extends State<EditorScreen>
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                     ),
                   ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecurringPaymentsSetup() {
+    return Card(
+      elevation: 2,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Setup Recurring Payment',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: AccountInput(
+                    onAccountSelected: (id, childPath, rootName) {
+                      setState(() {
+                        _recurringAccountId = id;
+                        _recurringAccountRoot = rootName;
+                      });
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.save),
+                  onPressed: _setupRecurringPayment,
+                  tooltip: 'Save Recurring Payment',
+                  color: Theme.of(context).primaryColor,
                 ),
               ],
             ),
@@ -813,8 +825,9 @@ class _EditorScreenState extends State<EditorScreen>
                   columns: const [
                     DataColumn(label: Text('Account')),
                     DataColumn(label: Text('Amount'), numeric: true),
-                    DataColumn(label: Text('Interval')),
                     DataColumn(label: Text('Next Date')),
+                    DataColumn(label: Text('Last Date')),
+                    DataColumn(label: Text('Interval')),
                     DataColumn(label: Text('Method')),
                     DataColumn(label: Text('')), // For delete button
                   ],
@@ -823,15 +836,17 @@ class _EditorScreenState extends State<EditorScreen>
                     final computed = computedList[i];
                     final accountId = p['accountId'] as String;
                     final amount = computed['calculatedAmount']?.toStringAsFixed(2) ?? '--';
-                    final interval = computed['intervalDays']?.toString() ?? '--';
                     final nextOccurrence = _formatDate(computed['nextOccurrence'] as String?);
+                    final lastOccurrence = _formatDate(computed['lastOccurrence'] as String?);
+                    final interval = computed['intervalDays']?.toString() ?? '--';
                     final method = computed['method'] ?? '--';
                     return DataRow(
                       cells: [
                         DataCell(Tooltip(message: accountId, child: Text(accountId, overflow: TextOverflow.ellipsis))),
                         DataCell(Text(amount)),
-                        DataCell(Text(interval)),
                         DataCell(Text(nextOccurrence)),
+                        DataCell(Text(lastOccurrence)),
+                        DataCell(Text(interval)),
                         DataCell(Chip(label: Text(method))),
                         DataCell(
                           IconButton(
@@ -1671,58 +1686,33 @@ class _AccountInputState extends State<AccountInput> {
 
                 link: _layerLink,
 
-                child: Row(
-
-                  mainAxisSize: MainAxisSize.min,
-
+                child: Wrap(
+                  spacing: 4.0,
+                  runSpacing: 4.0,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-
                     SizedBox(
-
                       width: 150,
-
                       child: Semantics(
-
                         label: 'Search or Add Account',
-
                         hint: 'Search for an existing account or enter a new name to create one',
-
                         child: TextField(
-
                           controller: _searchCtrl,
-
                           focusNode: _searchFocusNode,
-
                           decoration: InputDecoration(
-
                             hintText: 'Search or add...',
-
                             border: inputBorder,
-
                             focusedBorder: focusedInputBorder,
-
                             isDense: true,
-
                             contentPadding: const EdgeInsets.symmetric(vertical: 11, horizontal: 12),
-
                           ),
-
                           onChanged: _search,
-
                           onSubmitted: (v) => _handleCreate(),
-
                         ),
-
                       ),
-
                     ),
-
-                    const SizedBox(width: 4),
-
                     addIcon,
-
                   ],
-
                 ),
 
               ),
