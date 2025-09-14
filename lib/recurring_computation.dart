@@ -15,26 +15,29 @@ class ComputationResult {
   final double amount;
   final int? intervalDays;
   final DateTime nextOccurrence;
+  final DateTime lastOccurrence;
   final DateTime computedAt;
   final List<DateTime> datesUsed;
-  
+
   ComputationResult({
     required this.method,
     required this.amount,
     required this.intervalDays,
     required this.nextOccurrence,
+    required this.lastOccurrence,
     required this.computedAt,
     required this.datesUsed,
   });
-  
+
   Map<String, dynamic> toMap() => {
-    'method': method,
-    'amount': amount,
-    'intervalDays': intervalDays,
-    'nextOccurrence': nextOccurrence.toIso8601String(),
-    'computedAt': computedAt.toIso8601String(),
-    'dates': datesUsed.map((d) => d.toIso8601String()).join(','),
-  };
+        'method': method,
+        'amount': amount,
+        'intervalDays': intervalDays,
+        'nextOccurrence': nextOccurrence.toIso8601String(),
+        'lastOccurrence': lastOccurrence.toIso8601String(),
+        'computedAt': computedAt.toIso8601String(),
+        'dates': datesUsed.map((d) => d.toIso8601String()).join(','),
+      };
 }
 
 /// Small stats helpers
@@ -108,7 +111,8 @@ ComputationResult? computeRecurring(
   double? finalAmount;
   int? finalIntervalDays;
   String usedMethod = method.name;
-  
+  DateTime? lastDate; // Added to hold the last date from auto-suggestion
+
   if (method == ComputationMethod.manual) {
     if (manualAmount == null || manualIntervalDays == null) {
       throw ArgumentError('Manual method requires both amount and interval');
@@ -121,6 +125,7 @@ ComputationResult? computeRecurring(
     if (suggestion.amount != null) {
       finalAmount = suggestion.amount;
       finalIntervalDays = suggestion.intervalDays;
+      lastDate = suggestion.lastDate; // Capture lastDate from suggestion
       usedMethod = 'auto';
     }
   } else {
@@ -161,15 +166,17 @@ ComputationResult? computeRecurring(
   if (finalAmount == null) return null;
   
   final now = DateTime.now();
-  final nextDate = finalIntervalDays != null && dates.isNotEmpty
-    ? core_logic.computeNextOccurrenceDate(dates.first, finalIntervalDays)
-    : dates.first.add(const Duration(days: 30)); // Fallback to monthly
+  final lastOccurrence = lastDate ?? dates.first;
+  final nextDate = finalIntervalDays != null
+    ? core_logic.computeNextOccurrenceDate(lastOccurrence, finalIntervalDays)
+    : lastOccurrence.add(const Duration(days: 30)); // Fallback to monthly
     
   return ComputationResult(
     method: usedMethod,
     amount: finalAmount,
     intervalDays: finalIntervalDays,
     nextOccurrence: nextDate ?? now,
+    lastOccurrence: lastOccurrence,
     computedAt: now,
     datesUsed: dates,
   );

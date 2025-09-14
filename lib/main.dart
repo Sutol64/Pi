@@ -583,19 +583,36 @@ class _EditorScreenState extends State<EditorScreen>
         const SizedBox(height: 24),
 
         // NEW: Row for history and recurring payments
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              flex: 3, // Give more space to transaction history
-              child: _buildTransactionHistory(),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              flex: 2, // Give less space to recurring payments
-              child: _buildRecentRecurringPayments(),
-            ),
-          ],
+        LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth > 600) {
+              // Use Row for wider screens
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 3, // Give more space to transaction history
+                    child: _buildTransactionHistory(),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    flex: 2, // Give less space to recurring payments
+                    child: _buildRecentRecurringPayments(),
+                  ),
+                ],
+              );
+            } else {
+              // Use Column for narrower screens
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildTransactionHistory(),
+                  const SizedBox(height: 16),
+                  _buildRecentRecurringPayments(),
+                ],
+              );
+            }
+          },
         ),
       ],
     );
@@ -684,9 +701,11 @@ class _EditorScreenState extends State<EditorScreen>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Recent Transactions',
-                  style: Theme.of(context).textTheme.titleLarge,
+                Expanded(
+                  child: Text(
+                    'Recent Transactions',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
                 ),
                 TextButton(
                   onPressed: () {
@@ -754,9 +773,11 @@ class _EditorScreenState extends State<EditorScreen>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Recurring Payments',
-                  style: Theme.of(context).textTheme.titleLarge,
+                Expanded(
+                  child: Text(
+                    'Recurring Payments',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
                 ),
                 TextButton(
                   onPressed: () {

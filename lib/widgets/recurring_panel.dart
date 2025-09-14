@@ -116,8 +116,9 @@ class _RecurringPanelState extends State<RecurringPanel> {
                     columns: const [
                       DataColumn(label: Text('Account')),
                       DataColumn(label: Text('Amount'), numeric: true),
-                      DataColumn(label: Text('Interval')),
                       DataColumn(label: Text('Next Date')),
+                      DataColumn(label: Text('Last Date')),
+                      DataColumn(label: Text('Interval')),
                       DataColumn(label: Text('Method')),
                       DataColumn(label: Text('')), // For delete button
                     ],
@@ -128,13 +129,15 @@ class _RecurringPanelState extends State<RecurringPanel> {
                       final amount = computed['calculatedAmount']?.toStringAsFixed(2) ?? '--';
                       final interval = computed['intervalDays']?.toString() ?? '--';
                       final nextOccurrence = _formatDate(computed['nextOccurrence'] as String?);
+                      final lastOccurrence = _formatDate(computed['lastOccurrence'] as String?);
                       final method = computed['method'] ?? '--';
                       return DataRow(
                         cells: [
                           DataCell(Tooltip(message: accountId, child: Text(accountId, overflow: TextOverflow.ellipsis))),
                           DataCell(Text(amount)),
-                          DataCell(Text(interval)),
                           DataCell(Text(nextOccurrence)),
+                          DataCell(Text(lastOccurrence)),
+                          DataCell(Text(interval)),
                           DataCell(Chip(label: Text(method))),
                           DataCell(
                             IconButton(

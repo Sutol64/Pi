@@ -32,8 +32,9 @@ class RecurringSuggestion {
   final double? amount;
   final int? intervalDays;
   final DateTime? nextDate;
+  final DateTime? lastDate;
 
-  RecurringSuggestion({this.amount, this.intervalDays, this.nextDate});
+  RecurringSuggestion({this.amount, this.intervalDays, this.nextDate, this.lastDate});
 }
 
 // ------------------ Configurable constants ------------------
@@ -235,8 +236,19 @@ RecurringSuggestion getSuggestedRecurringAmountAndDate(List<Transaction> transac
   final amount = computeRecurringAmount(transactions);
   final intervalDays = computeRecurringIntervalDays(transactions);
   DateTime? nextDate;
-  if (intervalDays != null && transactions.isNotEmpty) {
-    nextDate = computeNextOccurrenceDate(transactions.first.postedAt, intervalDays, now: now);
+  DateTime? lastDate;
+
+  if (transactions.isNotEmpty) {
+    lastDate = transactions.first.postedAt;
+    if (intervalDays != null) {
+      nextDate = computeNextOccurrenceDate(lastDate, intervalDays, now: now);
+    }
   }
-  return RecurringSuggestion(amount: amount, intervalDays: intervalDays, nextDate: nextDate);
+
+  return RecurringSuggestion(
+    amount: amount,
+    intervalDays: intervalDays,
+    nextDate: nextDate,
+    lastDate: lastDate,
+  );
 }

@@ -542,7 +542,11 @@ class DatabaseHelper {
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
 
-    return recurringPayment;
+    // For the UI, add the last occurrence date to the returned map
+    return {
+      ...recurringPayment,
+      'lastOccurrence': result.lastOccurrence.toIso8601String(),
+    };
   }
 
   /// Recomputes a recurring payment using its current method.
@@ -611,7 +615,11 @@ class DatabaseHelper {
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
 
-    return recurringPayment;
+    // For the UI, add the last occurrence date to the returned map
+    return {
+      ...recurringPayment,
+      'lastOccurrence': result.lastOccurrence.toIso8601String(),
+    };
   }
 
   /// Deletes a recurring payment setup for a given account path.

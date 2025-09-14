@@ -13,8 +13,9 @@ class ReportsHeaderChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.start,
+    return Wrap(
+      spacing: 8.0, // Horizontal space between chips
+      runSpacing: 4.0, // Vertical space if they wrap
       children: <Widget>[
         ChoiceChip(
           label: const Text('Transactions'),
@@ -33,7 +34,6 @@ class ReportsHeaderChips extends StatelessWidget {
           backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
           showCheckmark: false,
         ),
-        const SizedBox(width: 8),
         ChoiceChip(
           label: const Text('Recurring'),
           selected: currentView == ReportsView.recurring,
