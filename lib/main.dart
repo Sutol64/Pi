@@ -1,18 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:flutter/scheduler.dart';
 import 'dart:convert';
 
 import 'database_helper.dart';
 import 'recurring_payment_api.dart';
 import 'recurring_payment_service.dart';
-import 'package:provider/provider.dart';
-import 'widgets/recurring_payment_form.dart';
 
 // New imports
 import 'package:personal_finance_app_00/reports_screen.dart';
-import 'package:personal_finance_app_00/widgets/transaction_tile.dart';
 import 'package:personal_finance_app_00/reports_view_enum.dart'; // Import ReportsView enum
 
 Future<void> main() async {
