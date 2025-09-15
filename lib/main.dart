@@ -10,6 +10,7 @@ import 'recurring_payment_service.dart';
 // New imports
 import 'package:personal_finance_app_00/reports_screen.dart';
 import 'package:personal_finance_app_00/reports_view_enum.dart'; // Import ReportsView enum
+import 'package:personal_finance_app_00/widgets/budget_section.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -192,6 +193,11 @@ class _EditorScreenState extends State<EditorScreen>
       final paymentsJson = await _recurringApi.fetchRecent(limit: 3);
       print('Received payments JSON: $paymentsJson');
       
+      if (paymentsJson.isEmpty) {
+        print('Warning: Received empty JSON string for recurring payments. Skipping decode.');
+        return;
+      }
+
       final payments = List<Map<String, dynamic>>.from(jsonDecode(paymentsJson));
       print('Decoded payments: $payments');
 
@@ -549,7 +555,11 @@ class _EditorScreenState extends State<EditorScreen>
 
         // NEW: Recurring Payments Setup
         _buildRecurringPaymentsSetup(),
-        const SizedBox(height: 24),
+  const SizedBox(height: 24),
+
+  // NEW: Budgeting Section inserted directly below recurring payments setup
+  const BudgetSection(),
+  const SizedBox(height: 24),
 
         // NEW: Row for history and recurring payments
         LayoutBuilder(
