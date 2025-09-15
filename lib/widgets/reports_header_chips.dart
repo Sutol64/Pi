@@ -31,7 +31,7 @@ class ReportsHeaderChips extends StatelessWidget {
                 : Theme.of(context).colorScheme.onSurface,
           ),
           selectedColor: Theme.of(context).colorScheme.primary,
-          backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+          backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
           showCheckmark: false,
         ),
         ChoiceChip(
@@ -48,7 +48,7 @@ class ReportsHeaderChips extends StatelessWidget {
                 : Theme.of(context).colorScheme.onSurface,
           ),
           selectedColor: Theme.of(context).colorScheme.primary,
-          backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+          backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
           showCheckmark: false,
         ),
       ],

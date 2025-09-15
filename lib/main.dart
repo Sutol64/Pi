@@ -410,7 +410,7 @@ class _EditorScreenState extends State<EditorScreen>
         SizedBox(
           width: 100,
           child: DropdownButtonFormField<bool>(
-            value: line.isDebit,
+            initialValue: line.isDebit,
             decoration: const InputDecoration(
               isDense: true,
               border: OutlineInputBorder(),
@@ -593,13 +593,17 @@ class _EditorScreenState extends State<EditorScreen>
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        child: Wrap(
+          spacing: 16.0, // Increased spacing between groups
+          runSpacing: 12.0,
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
+            // Group for Debits, Credits, and Status Icon
             Wrap(
-              alignment: WrapAlignment.end,
               spacing: 12.0,
               runSpacing: 8.0,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 Text('Debits: ${totalDebits.toStringAsFixed(2)}',
                     style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -618,11 +622,11 @@ class _EditorScreenState extends State<EditorScreen>
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            // Group for Buttons
             Wrap(
-              alignment: WrapAlignment.spaceBetween,
               spacing: 8.0,
               runSpacing: 8.0,
+              alignment: WrapAlignment.end,
               children: [
                 Semantics(
                   label: 'Add Line',
