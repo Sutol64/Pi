@@ -1,1 +1,1 @@
-enum ReportsView { transactions, recurring }
+enum ReportsView { transactions, recurring, budgets }

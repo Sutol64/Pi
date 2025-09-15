@@ -51,6 +51,23 @@ class ReportsHeaderChips extends StatelessWidget {
           backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
           showCheckmark: false,
         ),
+        ChoiceChip(
+          label: const Text('Budgets'),
+          selected: currentView == ReportsView.budgets,
+          onSelected: (bool selected) {
+            if (selected) {
+              onViewChanged(ReportsView.budgets);
+            }
+          },
+          labelStyle: TextStyle(
+            color: currentView == ReportsView.budgets
+                ? Theme.of(context).colorScheme.onPrimary
+                : Theme.of(context).colorScheme.onSurface,
+          ),
+          selectedColor: Theme.of(context).colorScheme.primary,
+          backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+          showCheckmark: false,
+        ),
       ],
     );
   }

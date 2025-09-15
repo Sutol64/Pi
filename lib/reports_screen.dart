@@ -3,6 +3,7 @@ import 'package:personal_finance_app_00/widgets/transactions_panel.dart';
 import 'package:personal_finance_app_00/widgets/recurring_panel.dart';
 import 'package:personal_finance_app_00/reports_view_enum.dart';
 import 'package:personal_finance_app_00/widgets/reports_control_header.dart';
+import 'package:personal_finance_app_00/widgets/budgets_panel.dart';
 
 // Define a GlobalKey for ReportsScreenState
 final GlobalKey<_ReportsScreenState> reportsScreenKey = GlobalKey<_ReportsScreenState>();
@@ -52,6 +53,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
     });
   }
 
+  Widget _buildCurrentView() {
+    switch (_currentView) {
+      case ReportsView.transactions:
+        return TransactionsPanel(expandAll: _expandAll);
+      case ReportsView.recurring:
+        return RecurringPanel(expandAll: _expandAll);
+      case ReportsView.budgets:
+        return BudgetsPanel(expandAll: _expandAll);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -63,9 +75,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           onToggleAll: _onToggleAll,
         ),
         Expanded(
-          child: _currentView == ReportsView.transactions
-              ? TransactionsPanel(expandAll: _expandAll)
-              : RecurringPanel(expandAll: _expandAll),
+          child: _buildCurrentView(),
         ),
       ],
     );
