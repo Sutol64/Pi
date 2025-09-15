@@ -591,6 +591,8 @@ class _EditorScreenState extends State<EditorScreen>
             }
           },
         ),
+        const SizedBox(height: 24),
+        const BudgetOverviewTable(),
       ],
     );
   }

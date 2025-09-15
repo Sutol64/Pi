@@ -186,6 +186,54 @@ class _BudgetSectionState extends State<BudgetSection> {
     );
   }
 
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 2,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: _buildForm(),
+      ),
+    );
+  }
+}
+
+class BudgetOverviewTable extends StatefulWidget {
+  const BudgetOverviewTable({super.key});
+
+  @override
+  State<BudgetOverviewTable> createState() => _BudgetOverviewTableState();
+}
+
+class _BudgetOverviewTableState extends State<BudgetOverviewTable> {
+  final BudgetService _service = BudgetService();
+  List<Budget> _budgets = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBudgets();
+  }
+
+  Future<void> _loadBudgets() async {
+    final list = await _service.fetchAll();
+    if (!mounted) return;
+    setState(() => _budgets = list);
+  }
+
+  Future<void> _deleteBudget(int id) async {
+    try {
+      await _service.deleteBudget(id);
+      if (!mounted) return;
+      setState(() => _budgets.removeWhere((b) => b.id == id));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to delete budget: $e')));
+    }
+  }
+
   Widget _buildTable() {
     if (_budgets.isEmpty) {
       return const Padding(
@@ -225,10 +273,6 @@ class _BudgetSectionState extends State<BudgetSection> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildForm(),
-            const SizedBox(height: 16),
-            const Divider(),
-            const SizedBox(height: 8),
             Text('Budget Overview', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
             _buildTable(),
