@@ -86,11 +86,49 @@ class _BudgetSectionState extends State<BudgetSection> {
         // Responsive layout: horizontal row on wide screens, stacked column on narrow
         LayoutBuilder(
           builder: (context, constraints) {
-            // If there's enough width for both controls side-by-side use Row
-            if (constraints.maxWidth > 480) {
+            final amountField = TextField(
+              controller: _amountController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'Amount',
+                hintText: '0.00',
+                prefixText: '\$',
+                border: OutlineInputBorder(),
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+              ),
+            );
+
+            final frequencyDropdown = DropdownButtonFormField<String>(
+              value: _frequency,
+              decoration: const InputDecoration(
+                labelText: 'Frequency',
+                isDense: true,
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'Weekly', child: Text('Weekly')),
+                DropdownMenuItem(value: 'Monthly', child: Text('Monthly')),
+                DropdownMenuItem(value: 'Yearly', child: Text('Yearly')),
+              ],
+              onChanged: (s) => setState(() => _frequency = s ?? 'Monthly'),
+            );
+
+            final saveButton = IconButton(
+              icon: _loading
+                  ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.save),
+              onPressed: _loading ? null : _createBudget,
+              tooltip: 'Save Budget',
+            );
+
+            // If there's enough width for all controls side-by-side use Row
+            if (constraints.maxWidth > 600) {
               return Row(
                 children: [
                   Expanded(
+                    flex: 30,
                     child: AccountInput(
                       initialAccountId: _selectedAccountId,
                       initialAccountPath: _selectedAccountPath,
@@ -102,25 +140,16 @@ class _BudgetSectionState extends State<BudgetSection> {
                       },
                     ),
                   ),
+                  
                   const SizedBox(width: 8),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(minWidth: 100, maxWidth: 160),
-                    child: DropdownButtonFormField<String>(
-                      value: _frequency,
-                      decoration: const InputDecoration(
-                        labelText: 'Frequency',
-                        isDense: true,
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'Weekly', child: Row(children: [Icon(Icons.calendar_view_day), SizedBox(width:8), Text('Weekly')])),
-                        DropdownMenuItem(value: 'Monthly', child: Row(children: [Icon(Icons.calendar_view_month), SizedBox(width:8), Text('Monthly')])),
-                        DropdownMenuItem(value: 'Yearly', child: Row(children: [Icon(Icons.calendar_today), SizedBox(width:8), Text('Yearly')])),
-                      ],
-                      onChanged: (s) => setState(() => _frequency = s ?? 'Monthly'),
-                    ),
+                  Expanded(
+                    flex: 4,
+                    child: frequencyDropdown,
                   ),
+                  const SizedBox(width: 8),
+                  Expanded(flex: 3, child: amountField),
+                  const SizedBox(width: 8),
+                  saveButton,
                 ],
               );
             }
@@ -140,42 +169,18 @@ class _BudgetSectionState extends State<BudgetSection> {
                   },
                 ),
                 const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  value: _frequency,
-                  decoration: const InputDecoration(
-                    labelText: 'Frequency',
-                    isDense: true,
-                    border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: 'Weekly', child: Row(children: [Icon(Icons.calendar_view_day), SizedBox(width:8), Text('Weekly')])),
-                    DropdownMenuItem(value: 'Monthly', child: Row(children: [Icon(Icons.calendar_view_month), SizedBox(width:8), Text('Monthly')])),
-                    DropdownMenuItem(value: 'Yearly', child: Row(children: [Icon(Icons.calendar_today), SizedBox(width:8), Text('Yearly')])),
+                Row(
+                  children: [
+                    Expanded(child: amountField),
+                    const SizedBox(width: 8),
+                    Expanded(child: frequencyDropdown),
+                    const SizedBox(width: 8),
+                    saveButton,
                   ],
-                  onChanged: (s) => setState(() => _frequency = s ?? 'Monthly'),
                 ),
               ],
             );
           },
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _amountController,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(labelText: 'Budget Amount', prefixText: '\$', border: OutlineInputBorder()),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: _loading ? null : _createBudget,
-                icon: _loading ? const SizedBox(width:16,height:16,child:CircularProgressIndicator(strokeWidth:2)) : const Icon(Icons.save),
-                label: const Text('Save Budget'),
-              ),
-            ),
-          ],
         ),
       ],
     );
@@ -199,8 +204,8 @@ class _BudgetSectionState extends State<BudgetSection> {
         ],
         rows: _budgets.map((b) {
           return DataRow(cells: [
-            DataCell(Text('${b.accountPath}')),
-            DataCell(Row(children: [Icon(b.type == 'weekly' ? Icons.calendar_view_day : b.type == 'monthly' ? Icons.calendar_view_month : Icons.calendar_today), const SizedBox(width:6), Text(b.type)])),
+            DataCell(Text(b.accountPath)),
+            DataCell(Text(b.type)),
             DataCell(Text(b.amount.toStringAsFixed(2))),
             DataCell(IconButton(icon: const Icon(Icons.delete_outline, color: Colors.redAccent), onPressed: () => _deleteBudget(b.id!))),
           ]);
