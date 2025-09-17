@@ -91,6 +91,12 @@ double _roundToTwoDecimals(double v) => (v * 100).roundToDouble() / 100.0;
 double? computeRecurringAmount(List<Transaction> transactions) {
   if (transactions.isEmpty) return null;
 
+  // Strategy 0: If there's only one transaction, use its amount
+  if (transactions.length == 1) {
+    AutoCalcTelemetry.incrementCounter('autocalc.amount.used_single_transaction');
+    return _roundToTwoDecimals(transactions.first.amount);
+  }
+
   // Convert to amounts preserving order (newest-first)
   final amounts = transactions.map((t) => t.amount).toList();
 
@@ -151,9 +157,9 @@ double? computeRecurringAmount(List<Transaction> transactions) {
 ///   a tolerance, return that interval.
 /// - Otherwise, compute average interval from the last five transactions.
 int? computeRecurringIntervalDays(List<Transaction> transactions) {
-  if (transactions.length < 3) {
+  if (transactions.length < 2) {
     AutoCalcTelemetry.incrementCounter('autocalc.skipped_insufficient_history');
-    return null;
+    return 30; // Default to 30 days if not enough data
   }
 
   // Helper: compute positive deltas in days between consecutive txns.
