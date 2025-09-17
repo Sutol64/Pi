@@ -570,6 +570,7 @@ class _EditorScreenState extends State<EditorScreen>
                   Expanded(
                     child: AccountInput(
                       initialAccountId: line.accountId,
+                      initialAccountRoot: line.accountRoot,
                       initialAccountPath: line.accountPath,
                       onAccountSelected: (id, childPath, rootName) {
                         setState(() {
@@ -1033,6 +1034,8 @@ class AccountInput extends StatefulWidget {
 
   final int? initialAccountId;
 
+  final String? initialAccountRoot;
+
   final String? initialAccountPath;
 
   // onAccountSelected now returns (id, childPathWithoutRoot, rootName)
@@ -1044,6 +1047,7 @@ class AccountInput extends StatefulWidget {
   const AccountInput(
 
       {super.key,
+      this.initialAccountRoot,
 
       this.initialAccountId,
 
@@ -1131,19 +1135,17 @@ class _AccountInputState extends State<AccountInput> {
     if (!mounted) return;
 
     setState(() => _rootIds = map);
-
   
+    // Use initialAccountRoot if available, otherwise fallback to initialAccountPath
+    final rootNameToSelect = widget.initialAccountRoot ?? widget.initialAccountPath;
 
-    if (widget.initialAccountPath != null && _rootNames.contains(widget.initialAccountPath)) {
-
+    if (rootNameToSelect != null && _rootNames.contains(rootNameToSelect)) {
       setState(() {
-
-        _selectedRootName = widget.initialAccountPath;
+        _selectedRootName = rootNameToSelect;
 
         _selectedRootId = _rootIds[_selectedRootName];
 
       });
-
       _notifyParent();
 
     }
