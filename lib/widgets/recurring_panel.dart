@@ -4,7 +4,6 @@ import 'package:personal_finance_app_00/recurring_payment_service.dart';
 import 'package:personal_finance_app_00/database_helper.dart';
 import 'dart:convert';
 
-
 class RecurringPanel extends StatefulWidget {
   final bool expandAll; // Added for consistency, though not directly used for expansion here
   const RecurringPanel({super.key, this.expandAll = false});
@@ -14,7 +13,6 @@ class RecurringPanel extends StatefulWidget {
 }
 
 class _RecurringPanelState extends State<RecurringPanel> {
-  List<Map<String, dynamic>> _recurringPayments = [];
   Future<List<Map<String, dynamic>>>? _computedPaymentsFuture;
   late final RecurringPaymentApi _recurringApi;
 
@@ -41,13 +39,15 @@ class _RecurringPanelState extends State<RecurringPanel> {
           final resultJson = await _recurringApi.recompute(p['accountId'] as String);
           final result = jsonDecode(resultJson) as Map<String, dynamic>? ?? <String, dynamic>{};
           print('Recompute result: $result');
-          return result;
+          return {
+            'payment': p,
+            'computed': result,
+          };
         }).toList());
       }
 
       if (mounted) {
         setState(() {
-          _recurringPayments = payments;
           _computedPaymentsFuture = createComputedFuture();
         });
         print('State updated with ${payments.length} payments');
@@ -55,6 +55,11 @@ class _RecurringPanelState extends State<RecurringPanel> {
     } catch (e, stackTrace) {
       print('Error loading recurring payments: $e');
       print('Stack trace: $stackTrace');
+       if (mounted) {
+        setState(() {
+          _computedPaymentsFuture = Future.value([]); // Set to empty list on error
+        });
+      }
     }
   }
 
@@ -93,67 +98,74 @@ class _RecurringPanelState extends State<RecurringPanel> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Removed the "All Recurring Payments" Text widget
-          if (_recurringPayments.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Center(child: Text('No recurring payments saved.')),
-            )
-          else
-            FutureBuilder<List<Map<String, dynamic>>>(
-              future: _computedPaymentsFuture,
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return const Padding(
-                    padding: EdgeInsets.all(16.0),
-                    child: Center(child: CircularProgressIndicator()),
-                  );
-                }
-                final computedList = snapshot.data!;
-                return SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: DataTable(
-                    columns: const [
-                      DataColumn(label: Text('Account')),
-                      DataColumn(label: Text('Amount'), numeric: true),
-                      DataColumn(label: Text('Next Date')),
-                      DataColumn(label: Text('Last Date')),
-                      DataColumn(label: Text('Interval')),
-                      DataColumn(label: Text('Method')),
-                      DataColumn(label: Text('')), // For delete button
-                    ],
-                    rows: List.generate(computedList.length, (i) {
-                      final p = _recurringPayments[i];
-                      final computed = computedList[i];
-                      final accountId = p['accountId'] as String;
-                      final amount = computed['calculatedAmount']?.toStringAsFixed(2) ?? '--';
-                      final interval = computed['intervalDays']?.toString() ?? '--';
-                      final nextOccurrence = _formatDate(computed['nextOccurrence'] as String?);
-                      final lastOccurrence = _formatDate(computed['lastOccurrence'] as String?);
-                      final method = computed['method'] ?? '--';
-                      return DataRow(
-                        cells: [
-                          DataCell(Tooltip(message: accountId, child: Text(accountId, overflow: TextOverflow.ellipsis))),
-                          DataCell(Text(amount)),
-                          DataCell(Text(nextOccurrence)),
-                          DataCell(Text(lastOccurrence)),
-                          DataCell(Text(interval)),
-                          DataCell(Chip(label: Text(method))),
-                          DataCell(
-                            IconButton(
-                              icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                              onPressed: () => _deleteRecurringPayment(accountId),
-                              tooltip: 'Delete Recurring Payment',
-                              splashRadius: 20,
-                            ),
-                          ),
-                        ],
-                      );
-                    }),
-                  ),
+          FutureBuilder<List<Map<String, dynamic>>>(
+            future: _computedPaymentsFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+                return const Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Center(child: CircularProgressIndicator()),
                 );
-              },
-            ),
+              }
+              if (snapshot.hasError) {
+                 return Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Center(child: Text('Error: ${snapshot.error}')),
+                );
+              }
+              if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Center(child: Text('No recurring payments saved.')),
+                );
+              }
+
+              final combinedList = snapshot.data!;
+              return SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
+                  columns: const [
+                    DataColumn(label: Text('Account')),
+                    DataColumn(label: Text('Amount'), numeric: true),
+                    DataColumn(label: Text('Next Date')),
+                    DataColumn(label: Text('Last Date')),
+                    DataColumn(label: Text('Interval')),
+                    DataColumn(label: Text('Method')),
+                    DataColumn(label: Text('')), // For delete button
+                  ],
+                  rows: List.generate(combinedList.length, (i) {
+                    final combined = combinedList[i];
+                    final p = combined['payment'] as Map<String, dynamic>;
+                    final computed = combined['computed'] as Map<String, dynamic>;
+                    final accountId = p['accountId'] as String;
+                    final amount = computed['calculatedAmount']?.toStringAsFixed(2) ?? '--';
+                    final interval = computed['intervalDays']?.toString() ?? '--';
+                    final nextOccurrence = _formatDate(computed['nextOccurrence'] as String?);
+                    final lastOccurrence = _formatDate(computed['lastOccurrence'] as String?);
+                    final method = computed['method'] ?? '--';
+                    return DataRow(
+                      cells: [
+                        DataCell(Tooltip(message: accountId, child: Text(accountId, overflow: TextOverflow.ellipsis))),
+                        DataCell(Text(amount)),
+                        DataCell(Text(nextOccurrence)),
+                        DataCell(Text(lastOccurrence)),
+                        DataCell(Text(interval)),
+                        DataCell(Chip(label: Text(method))),
+                        DataCell(
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                            onPressed: () => _deleteRecurringPayment(accountId),
+                            tooltip: 'Delete Recurring Payment',
+                            splashRadius: 20,
+                          ),
+                        ),
+                      ],
+                    );
+                  }),
+                ),
+              );
+            },
+          ),
         ],
       ),
     );

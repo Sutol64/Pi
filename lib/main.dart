@@ -11,6 +11,8 @@ import 'recurring_payment_service.dart';
 import 'package:personal_finance_app_00/reports_screen.dart';
 import 'package:personal_finance_app_00/reports_view_enum.dart'; // Import ReportsView enum
 import 'package:personal_finance_app_00/widgets/budget_section.dart';
+import 'models/budget.dart';
+import 'services/budget_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -151,6 +153,9 @@ class _EditorScreenState extends State<EditorScreen>
   int? _recurringAccountId;
   String? _recurringAccountRoot;
 
+  List<Budget> _budgets = [];
+  final BudgetService _budgetService = BudgetService();
+
   // start with two lines (debit & credit)
   final List<_EntryLine> _lines = [
     _EntryLine(accountPath: 'Assets', isDebit: true),
@@ -174,6 +179,7 @@ class _EditorScreenState extends State<EditorScreen>
     _loadRecentTransactions();
     // Initial load of recurring payments
     _loadRecentRecurringPayments();
+    _loadBudgets();
   }
 
   Future<void> _loadRecentTransactions() async {
@@ -364,6 +370,52 @@ class _EditorScreenState extends State<EditorScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to save transaction: $e')),
       );
+    }
+  }
+
+  Future<void> _loadBudgets() async {
+    final list = await _budgetService.fetchAll();
+    if (mounted) {
+      setState(() => _budgets = list);
+    }
+  }
+
+  Future<void> _createBudget({
+    required String type,
+    required int accountId,
+    required String accountPath,
+    required double amount,
+  }) async {
+    try {
+      final b = await _budgetService.createBudget(
+        type: type,
+        accountId: accountId,
+        accountPath: accountPath,
+        amount: amount,
+      );
+      if (mounted) {
+        setState(() {
+          _budgets.insert(0, b);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Budget saved')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to save budget: $e')));
+      }
+    }
+  }
+
+  Future<void> _deleteBudget(int id) async {
+    try {
+      await _budgetService.deleteBudget(id);
+      if (mounted) {
+        setState(() => _budgets.removeWhere((b) => b.id == id));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to delete budget: $e')));
+      }
     }
   }
 
@@ -558,7 +610,7 @@ class _EditorScreenState extends State<EditorScreen>
   const SizedBox(height: 24),
 
   // NEW: Budgeting Section inserted directly below recurring payments setup
-  const BudgetSection(),
+  BudgetSection(createBudget: _createBudget),
   const SizedBox(height: 24),
 
         // NEW: Row for history and recurring payments
@@ -592,7 +644,7 @@ class _EditorScreenState extends State<EditorScreen>
           },
         ),
         const SizedBox(height: 24),
-        const BudgetOverviewTable(),
+        BudgetOverviewTable(budgets: _budgets, deleteBudget: _deleteBudget),
       ],
     );
   }
