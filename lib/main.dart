@@ -152,6 +152,7 @@ class _EditorScreenState extends State<EditorScreen>
   Future<List<Map<String, dynamic>>>? _computedPaymentsFuture;
   int? _recurringAccountId;
   String? _recurringAccountRoot;
+  String? _recurringAccountPath;
 
   List<Budget> _budgets = [];
   final BudgetService _budgetService = BudgetService();
@@ -754,10 +755,14 @@ class _EditorScreenState extends State<EditorScreen>
               children: [
                 Expanded(
                   child: AccountInput(
+                    initialAccountId: _recurringAccountId,
+                    initialAccountRoot: _recurringAccountRoot,
+                    initialAccountPath: _recurringAccountPath,
                     onAccountSelected: (id, childPath, rootName) {
                       setState(() {
                         _recurringAccountId = id;
                         _recurringAccountRoot = rootName;
+                        _recurringAccountPath = childPath;
                       });
                     },
                   ),

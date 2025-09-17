@@ -18,15 +18,17 @@ class BudgetSection extends StatefulWidget {
 
 class _BudgetSectionState extends State<BudgetSection> {
   int? _selectedAccountId;
-  String? _selectedAccountPath;
+  String? _selectedAccountRoot;
+  String? _selectedChildPath;
   String _frequency = 'Monthly';
   final TextEditingController _amountController = TextEditingController();
   bool _loading = false;
 
   Future<void> _handleCreateBudget() async {
-    if (_selectedAccountId == null ||
-        _selectedAccountPath == null ||
-        _selectedAccountPath!.isEmpty) {
+    final fullPath = _selectedChildPath == null || _selectedChildPath!.isEmpty
+        ? _selectedAccountRoot
+        : '$_selectedAccountRoot > $_selectedChildPath';
+    if (_selectedAccountId == null || fullPath == null || fullPath.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Please select an account.')));
       return;
@@ -43,7 +45,7 @@ class _BudgetSectionState extends State<BudgetSection> {
       await widget.createBudget(
         type: _frequency.toLowerCase(),
         accountId: _selectedAccountId!,
-        accountPath: _selectedAccountPath!,
+        accountPath: fullPath,
         amount: value,
       );
       if (!mounted) return;
@@ -117,13 +119,13 @@ class _BudgetSectionState extends State<BudgetSection> {
                     flex: 30,
                     child: AccountInput(
                       initialAccountId: _selectedAccountId,
-                      initialAccountPath: _selectedAccountPath,
+                      initialAccountRoot: _selectedAccountRoot,
+                      initialAccountPath: _selectedChildPath,
                       onAccountSelected: (id, childPath, rootName) {
                         setState(() {
                           _selectedAccountId = id;
-                          _selectedAccountPath = childPath.isEmpty
-                              ? rootName
-                              : '$rootName > $childPath';
+                          _selectedAccountRoot = rootName;
+                          _selectedChildPath = childPath;
                         });
                       },
                     ),
@@ -147,13 +149,13 @@ class _BudgetSectionState extends State<BudgetSection> {
               children: [
                 AccountInput(
                   initialAccountId: _selectedAccountId,
-                  initialAccountPath: _selectedAccountPath,
+                  initialAccountRoot: _selectedAccountRoot,
+                  initialAccountPath: _selectedChildPath,
                   onAccountSelected: (id, childPath, rootName) {
                     setState(() {
                       _selectedAccountId = id;
-                      _selectedAccountPath = childPath.isEmpty
-                          ? rootName
-                          : '$rootName > $childPath';
+                      _selectedAccountRoot = rootName;
+                      _selectedChildPath = childPath;
                     });
                   },
                 ),
