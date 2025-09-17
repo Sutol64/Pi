@@ -100,7 +100,7 @@ class _BudgetSectionState extends State<BudgetSection> {
             );
 
             final frequencyDropdown = DropdownButtonFormField<String>(
-              value: _frequency,
+              initialValue: _frequency,
               decoration: const InputDecoration(
                 labelText: 'Frequency',
                 isDense: true,

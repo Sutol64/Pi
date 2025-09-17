@@ -639,6 +639,7 @@ class _EditorScreenState extends State<EditorScreen>
               spacing: 8.0,
               runSpacing: 8.0,
               alignment: WrapAlignment.end,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 Semantics(
                   label: 'Add Line',
@@ -652,20 +653,26 @@ class _EditorScreenState extends State<EditorScreen>
                     ),
                   ),
                 ),
-                Semantics(
-                  label: 'Save Transaction',
-                  hint: 'Saves the current transaction',
-                  child: ElevatedButton.icon(
-                    onPressed: _submit,
-                    icon: const Icon(Icons.save),
-                    label: const Text('Save Transaction'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Theme.of(context).primaryColor,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                    ),
-                  ),
+                IconButton(
+                  icon: const Icon(Icons.save),
+                  onPressed: _submit,
+                  tooltip: 'Save Transaction',
+                  color: Theme.of(context).primaryColor,
                 ),
+                // Semantics(
+                //   label: 'Save Transaction',
+                //   hint: 'Saves the current transaction',
+                //   child: ElevatedButton.icon(
+                //     onPressed: _submit,
+                //     icon: const Icon(Icons.save),
+                //     label: const Text('Save Transaction'),
+                //     style: ElevatedButton.styleFrom(
+                //       backgroundColor: Theme.of(context).primaryColor,
+                //       foregroundColor: Colors.white,
+                //       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                //     ),
+                //   ),
+                // ),
               ],
             ),
           ],
@@ -851,6 +858,7 @@ class _EditorScreenState extends State<EditorScreen>
                     final p = _recentRecurringPayments[i];
                     final computed = computedList[i];
                     final accountId = p['accountId'] as String;
+                    final accountName = accountId.split(' > ').last;
                     final amount = computed['calculatedAmount']?.toStringAsFixed(2) ?? '--';
                     final nextOccurrence = _formatDate(computed['nextOccurrence'] as String?);
                     final lastOccurrence = _formatDate(computed['lastOccurrence'] as String?);
@@ -858,7 +866,7 @@ class _EditorScreenState extends State<EditorScreen>
                     final method = computed['method'] ?? '--';
                     return DataRow(
                       cells: [
-                        DataCell(Tooltip(message: accountId, child: Text(accountId, overflow: TextOverflow.ellipsis))),
+                        DataCell(Tooltip(message: accountId, child: Text(accountName, overflow: TextOverflow.ellipsis))),
                         DataCell(Text(amount)),
                         DataCell(Text(nextOccurrence)),
                         DataCell(Text(lastOccurrence)),
