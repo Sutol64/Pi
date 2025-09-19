@@ -84,7 +84,7 @@ class _BudgetSectionState extends State<BudgetSection> {
             );
 
             final frequencyDropdown = DropdownButtonFormField<String>(
-              value: _frequency,
+              initialValue: _frequency,
               decoration: const InputDecoration(
                 labelText: 'Frequency',
                 isDense: true,
@@ -238,7 +238,9 @@ class BudgetOverviewTable extends StatelessWidget {
         rows: budgets.map((b) {
           return DataRow(cells: [
             DataCell(Text(b.accountPath)),
-            DataCell(Text(b.type)),
+            DataCell(Text(b.type.isNotEmpty
+                ? '${b.type[0].toUpperCase()}${b.type.substring(1)}'
+                : '')),
             DataCell(Text(b.amount.toStringAsFixed(2))),
             DataCell(IconButton(
                 icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
