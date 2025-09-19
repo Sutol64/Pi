@@ -646,7 +646,25 @@ class _EditorScreenState extends State<EditorScreen>
           },
         ),
         const SizedBox(height: 24),
-        BudgetOverviewTable(budgets: _budgets, deleteBudget: _deleteBudget),
+        BudgetOverviewTable(
+          budgets: _budgets,
+          deleteBudget: _deleteBudget,
+          onViewAll: () {
+            final tabController = DefaultTabController.of(context);
+            if (tabController.index != 2) {
+              // Add a listener to be notified when the animation is done
+              void listener() {
+                if (tabController.indexIsChanging == false && tabController.index == 2) {
+                  // Once we're on the Reports tab, select the Budgets view
+                  reportsScreenKey.currentState?.selectView(ReportsView.budgets);
+                  tabController.removeListener(listener); // Clean up the listener
+                }
+              }
+              tabController.addListener(listener);
+              tabController.animateTo(2); // Animate to the Reports tab
+            }
+          },
+        ),
       ],
     );
   }
@@ -873,13 +891,22 @@ class _EditorScreenState extends State<EditorScreen>
                   ),
                 ),
                 TextButton(
-                  onPressed: () {
-                    // Get the TabController
-                    final TabController tabController = DefaultTabController.of(context);
-                    // Animate to the Reports tab (index 2)
-                    tabController.animateTo(2);
-                    // Select the Recurring view in ReportsScreen
-                    reportsScreenKey.currentState?.selectView(ReportsView.recurring);
+                  onPressed: () {                    
+                    final tabController = DefaultTabController.of(context);
+                    if (tabController.index == 2) {
+                      // Already on the Reports tab, just switch the view
+                      reportsScreenKey.currentState?.selectView(ReportsView.recurring);
+                    } else {
+                      // Not on the Reports tab, animate and then switch view
+                      void listener() {
+                        if (!tabController.indexIsChanging && tabController.index == 2) {
+                          reportsScreenKey.currentState?.selectView(ReportsView.recurring);
+                          tabController.removeListener(listener);
+                        }
+                      }
+                      tabController.addListener(listener);
+                      tabController.animateTo(2);
+                    }
                   },
                   child: const Text('View All'),
                 ),

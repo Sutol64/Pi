@@ -194,9 +194,14 @@ class _BudgetSectionState extends State<BudgetSection> {
 class BudgetOverviewTable extends StatelessWidget {
   final List<Budget> budgets;
   final Function(int) deleteBudget;
+  final VoidCallback? onViewAll;
 
-  const BudgetOverviewTable(
-      {super.key, required this.budgets, required this.deleteBudget});
+  const BudgetOverviewTable({
+    super.key,
+    required this.budgets,
+    required this.deleteBudget,
+    this.onViewAll,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -204,17 +209,21 @@ class BudgetOverviewTable extends StatelessWidget {
       elevation: 2,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('Budget Overview',
-                style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 8),
-            _buildTable(),
-          ],
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Budget Overview', style: Theme.of(context).textTheme.titleLarge),
+                if (onViewAll != null) TextButton(onPressed: onViewAll, child: const Text('View All')),
+              ],
+            ),
+          ),
+          _buildTable(),
+        ],
       ),
     );
   }
@@ -222,7 +231,7 @@ class BudgetOverviewTable extends StatelessWidget {
   Widget _buildTable() {
     if (budgets.isEmpty) {
       return const Padding(
-        padding: EdgeInsets.all(12.0),
+        padding: EdgeInsets.all(16.0),
         child: Center(child: Text('No budgets defined.')),
       );
     }
