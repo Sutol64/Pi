@@ -291,6 +291,17 @@ class _EditorScreenState extends State<EditorScreen>
       return;
     }
 
+    String getLineDisplayName(_EntryLine line) {
+      final childPath = line.accountPath.trim();
+      if (childPath.isNotEmpty) {
+        return childPath.split(' > ').last.trim();
+      }
+      return (line.accountRoot ?? '').trim();
+    }
+
+    final description = _descriptionController.text.trim();
+    final finalDescription = description.isNotEmpty ? description : '${getLineDisplayName(_lines[0])} - ${getLineDisplayName(_lines[1])}';
+
     String buildStoredAccount(_EntryLine l) {
       final root = (l.accountRoot ?? '').trim();
       final child = l.accountPath.trim();
@@ -317,7 +328,7 @@ class _EditorScreenState extends State<EditorScreen>
     try {
       final id = await DatabaseHelper.instance.insertTransaction(
         date: _date,
-        description: _descriptionController.text.trim(),
+        description: finalDescription,
         lines: linesForDb,
       );
 
