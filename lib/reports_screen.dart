@@ -20,6 +20,8 @@ class ReportsScreen extends StatefulWidget {
 class _ReportsScreenState extends State<ReportsScreen> {
   ReportsView _currentView = ReportsView.transactions;
   bool _expandAll = true; // New state for expand/collapse all
+  String _searchQuery = '';
+  Map<String, dynamic> _filterOptions = {};
 
   @override
   void initState() {
@@ -47,6 +49,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
     });
   }
 
+  void _onSearch(String q) {
+    setState(() => _searchQuery = q);
+  }
+
+  void _onFiltersChanged(Map<String, dynamic> opts) {
+    setState(() => _filterOptions = opts);
+  }
+
   void _onToggleAll(bool expand) {
     setState(() {
       _expandAll = expand;
@@ -56,7 +66,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   Widget _buildCurrentView() {
     switch (_currentView) {
       case ReportsView.transactions:
-        return TransactionsPanel(expandAll: _expandAll);
+        return TransactionsPanel(expandAll: _expandAll, searchQuery: _searchQuery, filterOptions: _filterOptions);
       case ReportsView.recurring:
         return RecurringPanel(expandAll: _expandAll);
       case ReportsView.budgets:
@@ -73,6 +83,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
           onViewChanged: _onViewChanged,
           expandAll: _expandAll,
           onToggleAll: _onToggleAll,
+          onSearch: _onSearch,
+          onFiltersChanged: _onFiltersChanged,
         ),
         Expanded(
           child: _buildCurrentView(),

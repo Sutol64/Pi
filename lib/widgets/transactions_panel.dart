@@ -5,7 +5,9 @@ import 'package:personal_finance_app_00/widgets/transaction_tile.dart';
 
 class TransactionsPanel extends StatefulWidget {
   final bool expandAll;
-  const TransactionsPanel({super.key, this.expandAll = false});
+  final String? searchQuery;
+  final Map<String, dynamic>? filterOptions;
+  const TransactionsPanel({super.key, this.expandAll = false, this.searchQuery, this.filterOptions});
 
   @override
   State<TransactionsPanel> createState() => _TransactionsPanelState();
@@ -45,6 +47,15 @@ class _TransactionsPanelState extends State<TransactionsPanel> {
     if (widget.expandAll != oldWidget.expandAll) {
       _toggleAll(widget.expandAll);
     }
+    // If search or filter options changed, reload and regroup using the new criteria
+    if (widget.searchQuery != oldWidget.searchQuery || widget.filterOptions != oldWidget.filterOptions) {
+      // If we already have loaded transactions, apply filter immediately
+      _futureTxs.then((txs) {
+        if (!mounted) return;
+        final filtered = _applyFilters(txs, widget.searchQuery, widget.filterOptions);
+        _groupTransactions(filtered);
+      });
+    }
   }
 
   void _load() {
@@ -82,6 +93,62 @@ class _TransactionsPanelState extends State<TransactionsPanel> {
       _isMonthExpanded = newMonthExpanded;
       _isTransactionExpanded = newTransactionExpanded;
     });
+  }
+
+  List<Map<String, dynamic>> _applyFilters(List<Map<String, dynamic>> txs, String? search, Map<String, dynamic>? filters) {
+    if ((search == null || search.trim().isEmpty) && (filters == null || filters.isEmpty)) return txs;
+    final q = (search ?? '').toLowerCase().trim();
+    final List<Map<String, dynamic>> out = [];
+    for (final tx in txs) {
+      bool keep = true;
+      if (q.isNotEmpty) {
+        // Simple heuristics: check description, account paths and date string, and numeric amount
+        final desc = (tx['description'] as String?)?.toLowerCase() ?? '';
+        final dateStr = (tx['date'] as String?)?.toLowerCase() ?? '';
+        final lines = (tx['lines'] as List<dynamic>? ?? <dynamic>[]).cast<Map<String, dynamic>>();
+        final accountText = lines.map((l) => (l['account'] as String?)?.toLowerCase() ?? '').join(' ');
+
+        // amount parse
+        double? qAmount;
+        final amountMatch = RegExp(r'^[\$€£]?\s*([0-9,\.]+)\$?').firstMatch(q);
+        if (amountMatch != null) {
+          final numeric = amountMatch.group(1)!.replaceAll(',', '');
+          qAmount = double.tryParse(numeric);
+        }
+
+        bool matched = false;
+        if (desc.contains(q) || accountText.contains(q) || dateStr.contains(q)) matched = true;
+        if (!matched && qAmount != null) {
+          for (final l in lines) {
+            final debit = (l['debit'] as num?)?.toDouble() ?? 0.0;
+            final credit = (l['credit'] as num?)?.toDouble() ?? 0.0;
+            if ((debit - qAmount).abs() < 1e-9 || (credit - qAmount).abs() < 1e-9) {
+              matched = true;
+              break;
+            }
+          }
+        }
+        if (!matched) keep = false;
+      }
+
+      if (keep && filters != null && filters.containsKey('type')) {
+        final type = (filters['type'] as String?) ?? 'all';
+        if (type != 'all') {
+          final lines = (tx['lines'] as List<dynamic>? ?? <dynamic>[]).cast<Map<String, dynamic>>();
+          bool hasType = false;
+          for (final l in lines) {
+            final debit = (l['debit'] as num?)?.toDouble() ?? 0.0;
+            final credit = (l['credit'] as num?)?.toDouble() ?? 0.0;
+            if (type == 'debit' && debit > 0.0) hasType = true;
+            if (type == 'credit' && credit > 0.0) hasType = true;
+          }
+          if (!hasType) keep = false;
+        }
+      }
+
+      if (keep) out.add(tx);
+    }
+    return out;
   }
 
   Future<void> _refresh() async {

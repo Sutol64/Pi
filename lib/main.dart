@@ -658,7 +658,7 @@ class _EditorScreenState extends State<EditorScreen>
         ),
         const SizedBox(height: 24),
         BudgetOverviewTable(
-          budgets: _budgets,
+          budgets: _budgets.take(3).toList(),
           deleteBudget: _deleteBudget,
           onViewAll: () {
             final tabController = DefaultTabController.of(context);
