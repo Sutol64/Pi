@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:personal_finance_app_00/database_helper.dart';
 import 'package:personal_finance_app_00/widgets/transaction_tile.dart';
+import 'package:personal_finance_app_00/services/transaction_search_engine.dart';
 
 class TransactionsPanel extends StatefulWidget {
   final bool expandAll;
@@ -15,6 +16,7 @@ class TransactionsPanel extends StatefulWidget {
 
 class _TransactionsPanelState extends State<TransactionsPanel> {
   late Future<List<Map<String, dynamic>>> _futureTxs;
+  TransactionSearchEngine? _searchEngine;
   Map<int, Map<int, List<Map<String, dynamic>>>> _groupedTransactions = {};
   Map<int, bool> _isYearExpanded = {};
   Map<String, bool> _isMonthExpanded = {}; // Key: "year-month"
