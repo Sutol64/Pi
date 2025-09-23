@@ -69,7 +69,7 @@ class HomeScreen extends StatelessWidget {
 
         appBar: AppBar(
 
-          title: const Text('Personal Finance'),
+          toolbarHeight: 0,
 
           bottom: const TabBar(
 

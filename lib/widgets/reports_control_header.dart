@@ -3,11 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:personal_finance_app_00/reports_view_enum.dart';
 import 'package:personal_finance_app_00/widgets/reports_header_chips.dart';
 
-
-// Implement the advanced TransactionSearchEngine with fuzzy matching and inverted indexes and replace the in-memory filter 
-import 'package:personal_finance_app_00/services/transaction_search_engine.dart';
-
-
 class ReportsControlHeader extends StatefulWidget {
   final ReportsView currentView;
   final ValueChanged<ReportsView> onViewChanged;
