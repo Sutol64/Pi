@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:month_year_picker/month_year_picker.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'dart:convert';
 
@@ -13,6 +15,7 @@ import 'package:personal_finance_app_00/reports_view_enum.dart'; // Import Repor
 import 'package:personal_finance_app_00/widgets/budget_section.dart';
 import 'models/budget.dart';
 import 'services/budget_service.dart';
+import 'screens/assets_screen.dart'; // Import the new AssetsScreen
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -39,10 +42,16 @@ class MyApp extends StatelessWidget {
 
       title: 'Personal Finance',
 
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
+      theme: ThemeData.dark().copyWith(
+        primaryColor: Colors.blue,
         // Keep default font settings so Material icons render correctly.
       ),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        MonthYearPickerLocalizations.delegate,
+      ],
 
       home: const HomeScreen(),
       // Removed the /reports route definition
@@ -63,7 +72,7 @@ class HomeScreen extends StatelessWidget {
 
     return DefaultTabController(
 
-      length: 4,
+      length: 5, // Increased length to 5
 
       child: Scaffold(
 
@@ -76,7 +85,7 @@ class HomeScreen extends StatelessWidget {
             tabs: [
 
               Tab(text: 'Dashboard'),
-
+              Tab(text: 'Assets'), // Added Assets tab
               Tab(text: 'Editor'),
 
               Tab(text: 'Reports'),
@@ -96,7 +105,7 @@ class HomeScreen extends StatelessWidget {
           children: [
 
             DashboardScreen(),
-
+            const AssetsScreen(), // Added AssetsScreen
             EditorScreen(),
 
             ReportsScreen(key: reportsScreenKey), // Pass the GlobalKey here
