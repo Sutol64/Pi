@@ -6,7 +6,7 @@ import 'package:personal_finance_app_00/widgets/reports_control_header.dart';
 import 'package:personal_finance_app_00/widgets/budgets_panel.dart';
 
 // Define a GlobalKey for ReportsScreenState
-final GlobalKey<_ReportsScreenState> reportsScreenKey = GlobalKey<_ReportsScreenState>();
+final GlobalKey<ReportsScreenState> reportsScreenKey = GlobalKey<ReportsScreenState>();
 
 class ReportsScreen extends StatefulWidget {
   final Map<String, String>? initialViewArguments;
@@ -14,10 +14,10 @@ class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key, this.initialViewArguments});
 
   @override
-  State<ReportsScreen> createState() => _ReportsScreenState();
+  State<ReportsScreen> createState() => ReportsScreenState();
 }
 
-class _ReportsScreenState extends State<ReportsScreen> {
+class ReportsScreenState extends State<ReportsScreen> {
   ReportsView _currentView = ReportsView.transactions;
   bool _expandAll = true; // New state for expand/collapse all
   String _searchQuery = '';
@@ -27,10 +27,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   void initState() {
     super.initState();
     if (widget.initialViewArguments != null && widget.initialViewArguments!['view'] == 'recurring') {
-      print('ReportsScreen: Initial view argument is recurring. Setting _currentView to ReportsView.recurring');
       _currentView = ReportsView.recurring; // Directly set _currentView
-    } else {
-      print('ReportsScreen: No initial view argument or not recurring. _currentView remains $_currentView');
     }
   }
 

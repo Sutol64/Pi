@@ -3,7 +3,7 @@ import 'package:month_year_picker/month_year_picker.dart';
 import '../widgets/assets/view_toggle.dart';
 import '../widgets/assets/asset_table.dart';
 import '../widgets/assets/asset_charts.dart';
-import '../widgets/assets/view_toggle.dart'; // Import AssetView enum
+// AssetView enum is in view_toggle.dart, TimePeriod is in asset_charts.dart
 
 class AssetsScreen extends StatefulWidget {
   const AssetsScreen({super.key});
@@ -14,8 +14,8 @@ class AssetsScreen extends StatefulWidget {
 
 class _AssetsScreenState extends State<AssetsScreen> {
   AssetView _currentView = AssetView.table;
-  TimePeriod _selectedPeriod = TimePeriod.year; // New state
-  DateTime _selectedDate = DateTime.now(); // New state
+  TimePeriod _selectedPeriod = TimePeriod.year;
+  DateTime _selectedDate = DateTime.now();
 
   Widget _buildTimePeriodSelector() {
     return Wrap(
@@ -57,7 +57,7 @@ class _AssetsScreenState extends State<AssetsScreen> {
           },
         ),
         TextButton(
-          onPressed: () => _selectMonthYear(context),
+          onPressed: () => _selectDate(context),
           child: Text(
             _selectedPeriod == TimePeriod.month // Use a more readable format for the month
                 ? '${_getMonthAbbreviation(_selectedDate.month)} - ${_selectedDate.year}'
@@ -83,7 +83,7 @@ class _AssetsScreenState extends State<AssetsScreen> {
     );
   }
 
-  Future<void> _selectMonthYear(BuildContext context) async {
+  Future<void> _selectDate(BuildContext context) async {
     DateTime? picked;
 
     if (_selectedPeriod == TimePeriod.year) {

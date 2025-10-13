@@ -2,6 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'recurring_payments_logic.dart' as recurring_logic;
 import 'recurring_computation.dart' show computeRecurring, ComputationMethod;
+import 'models/asset.dart';
 
 /// Singleton class for managing the SQLite database operations.
 /// Handles account, transaction, and recurring payment data with schema migrations.
@@ -300,13 +301,35 @@ class DatabaseHelper {
         'description': description,
       });
 
+      final accountPaths = lines.map((l) => l['account'] as String).toSet();
+      final accountIds = <String, int>{};
+
+      // Pre-fetch account IDs for the paths used in the transaction
+      for (final path in accountPaths) {
+        // This is a simplified lookup. A more robust solution might parse the path
+        // and traverse the hierarchy to find the correct ID.
+        final accounts = await txn.query('accounts', where: 'name = ?', whereArgs: [path.split(':').last], limit: 1);
+        if (accounts.isNotEmpty) {
+          accountIds[path] = accounts.first['id'] as int;
+        }
+      }
+
       for (final line in lines) {
+        final accountPath = line['account'] as String;
+        final debit = (line['debit'] as num).toDouble();
+        final credit = (line['credit'] as num).toDouble();
+
         await txn.insert('transaction_lines', {
           'transaction_id': txId,
-          'account': line['account'],
-          'debit': (line['debit'] as num).toDouble(),
-          'credit': (line['credit'] as num).toDouble(),
+          'account': accountPath,
+          'debit': debit,
+          'credit': credit,
         });
+
+        // Update the account balance
+        await txn.execute('''
+          UPDATE accounts SET balance = balance + ? WHERE name = ?
+        ''', [debit - credit, accountPath.split(':').last]);
       }
 
       return txId;
@@ -649,6 +672,21 @@ class DatabaseHelper {
       'recurring_payments',
       orderBy: 'updatedAt DESC',
     );
+  }
+
+  /// Fetches all asset and liability accounts and returns them as a list of Asset models.
+  Future<List<Asset>> getAllAssets() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'accounts',
+      where: 'account_type = ? OR account_type = ?',
+      whereArgs: ['asset', 'liability'],
+      orderBy: 'parent_id ASC, name ASC',
+    );
+
+    return List.generate(maps.length, (i) {
+      return Asset.fromMap(maps[i]);
+    });
   }
 
   Future<void> close() async {

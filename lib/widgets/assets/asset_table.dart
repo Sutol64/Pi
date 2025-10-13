@@ -1,7 +1,9 @@
 
 import 'package:flutter/material.dart';
+import '../../database_helper.dart';
 import '../../models/asset.dart';
 
+/// The AssetTable widget displays a hierarchical table of assets with expandable rows.
 class AssetTable extends StatefulWidget {
   const AssetTable({super.key});
 
@@ -10,212 +12,94 @@ class AssetTable extends StatefulWidget {
 }
 
 class _AssetTableState extends State<AssetTable> {
-  late List<Asset> _assets;
-
-  @override
-  void initState() {
-    super.initState();
-    _assets = _getMockAssets();
-  }
-
-  List<Asset> _getMockAssets() {
-    return [
-      Asset(
-        id: '1',
-        name: 'Retirement Accounts',
-        isExpanded: true,
-        children: [
-          Asset(
-            id: '1.1',
-            name: '401(k)',
-            investmentAmount: 120000,
-            withdrawalAmount: 0,
-            currentValue: 150000,
-            absoluteReturn: 30000,
-          ),
-          Asset(
-            id: '1.2',
-            name: 'Roth IRA',
-            investmentAmount: 50000,
-            withdrawalAmount: 10000,
-            currentValue: 65000,
-            absoluteReturn: 15000,
-          ),
-        ],
-      ),
-      Asset(
-        id: '2',
-        name: 'Brokerage Accounts',
-        isExpanded: true,
-        children: [
-          Asset(
-            id: '2.1',
-            name: 'Taxable Account',
-            investmentAmount: 75000,
-            withdrawalAmount: 5000,
-            currentValue: 90000,
-            absoluteReturn: 15000,
-          ),
-        ],
-      ),
-    ];
-  }
+  // A map to hold the expansion state of each asset by its ID.
+  // This allows for programmatic control over which tiles are expanded.
+  final Map<int, bool> _isExpanded = {};
 
   @override
   Widget build(BuildContext context) {
-    // The main layout is a Column with a sticky header and a scrollable body.
-    return Column(
-      children: [
-        _buildHeader(),
-        Expanded(
-          child: ListView(
-            children: [_buildAssetTree(_assets, 0)],
-          ),
-        ),
-      ],
+    return FutureBuilder<List<Asset>>(
+      future: DatabaseHelper.instance.getAllAssets(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        } else if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const Center(child: Text('No assets found.'));
+        }
+
+        final assets = snapshot.data!;
+
+        // Group assets by their parentId for efficient lookup (O(N)).
+        // The previous method of finding children was O(N^2).
+        final childrenMap = <int?, List<Asset>>{};
+        for (final asset in assets) {
+          (childrenMap[asset.parentId] ??= []).add(asset);
+        }
+
+        // Find the main "Assets" root account.
+        Asset? assetsRoot;
+        try {
+          assetsRoot = (childrenMap[null] ?? [])
+              .firstWhere((a) => a.name == 'Assets');
+        } catch (e) {
+          assetsRoot = null; // Asset not found
+        }
+
+        // If the "Assets" root is not found, show a message.
+        if (assetsRoot == null) {
+          return const Center(child: Text('"Assets" root account not found.'));
+        }
+
+        final assetsToDisplay = childrenMap[assetsRoot.id] ?? [];
+
+        return ListView(
+          children: assetsToDisplay
+              .map((asset) => _buildAssetRow(asset, childrenMap, 0))
+              .toList(),
+        );
+      },
     );
   }
 
-  /// Builds the sticky header row for the table.
-  Widget _buildHeader() {
-    // This Row mimics the structure of the data rows for alignment.
-    return Container(
-      color: Colors.grey.shade900, // A slightly different color for the header
-      padding: const EdgeInsets.symmetric(vertical: 12.0),
-      child: Row(
-        children: [
-          // Flex 2 for the 'Account' part of the header.
-          const Expanded(
-            flex: 2,
-            child: Padding(
-              padding: EdgeInsets.only(left: 16.0, right: 8.0),
-              child: Text('Account', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            ),
-          ),
-          // Flex 5 for the data columns part of the header.
-          Expanded(
-            flex: 5,
-            child: Row(
-              children: const [
-                Expanded(
-                  child: Center(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 2.0),
-                      child: FittedBox(fit: BoxFit.scaleDown, child: Text('Investment', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Center(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 2.0),
-                      child: FittedBox(fit: BoxFit.scaleDown, child: Text('Withdrawal', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                    ),
-                  ),
-                ),
-                Expanded(child: Center(child: FittedBox(fit: BoxFit.scaleDown, child: Text('XIRR', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))))),
-                Expanded(
-                  child: Center(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 2.0),
-                      child: FittedBox(fit: BoxFit.scaleDown, child: Text('Abs. Return', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Center(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 2.0),
-                      child: FittedBox(fit: BoxFit.scaleDown, child: Text('Gain/Loss', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Center(child: FittedBox(fit: BoxFit.scaleDown, child: Text('Current Value', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)))),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _buildAssetRow(
+      Asset asset, Map<int?, List<Asset>> childrenMap, int level) {
+    final childAssets = childrenMap[asset.id] ?? [];
 
-  Widget _buildAssetTree(List<Asset> assets, int level) {
-    // This remains the same, building the tree structure recursively.
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: assets.map((asset) => _buildAssetRow(asset, level)).toList(),
-    );
-  }
-
-  Widget _buildAssetRow(Asset asset, int level) {
-    // The row structure is updated to align with the new header.
-    return Column(
-      children: [
-        InkWell(
-          onTap: () {
-            if (asset.children.isNotEmpty) {
-              setState(() {
-                _toggleExpanded(asset.id);
-              });
-            }
-          },
-          child: Container(
-            color: level % 2 == 0 ? Colors.grey.shade800 : Colors.grey.shade900,
-            padding: EdgeInsets.only(left: 16.0 * level, top: 12.0, bottom: 12.0),
-            child: Row(
-              children: [
-                if (asset.children.isNotEmpty)
-                  Icon(
-                    asset.isExpanded ? Icons.expand_more : Icons.chevron_right,
-                    color: Colors.white,
-                  )
-                else
-                  const SizedBox(width: 24), // for alignment
-                Expanded(
-                  flex: 2,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                    child: Text(asset.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  ),
-                ),
-                // The data cells are now in a Row of Expanded widgets to align with the header.
-                Expanded(
-                  flex: 5,
-                  child: Row(
-                    children: [
-                      Expanded(child: Center(child: Text(asset.investmentAmount.toString(), style: const TextStyle(color: Colors.white)))),
-                      Expanded(child: Center(child: Text(asset.withdrawalAmount.toString(), style: const TextStyle(color: Colors.white)))),
-                      const Expanded(child: Center(child: Text('', style: TextStyle(color: Colors.white)))), // XIRR
-                      Expanded(child: Center(child: Text(asset.absoluteReturn.toString(), style: const TextStyle(color: Colors.white)))),
-                      const Expanded(child: Center(child: Text('', style: TextStyle(color: Colors.white)))), // Gain/Loss
-                      Expanded(child: Center(child: Text(asset.currentValue.toString(), style: const TextStyle(color: Colors.white)))),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (asset.isExpanded && asset.children.isNotEmpty)
-          _buildAssetTree(asset.children, level + 1),
-      ],
-    );
-  }
-
-  void _toggleExpanded(String id) {
-    // This logic remains the same.
-    List<Asset> newAssets = [];
-    for (var asset in _assets) {
-      if (asset.id == id) {
-        newAssets.add(asset.copyWith(isExpanded: !asset.isExpanded));
-      } else {
-        newAssets.add(asset);
+    // Recursively calculate the total value of an asset and all its children.
+    double calculateTotalValue(Asset currentAsset) {
+      double total = currentAsset.value;
+      final children = childrenMap[currentAsset.id] ?? [];
+      for (final child in children) {
+        total += calculateTotalValue(child);
       }
+      return total;
     }
-    setState(() {
-      _assets = newAssets;
-    });
+
+    final totalValue = calculateTotalValue(asset);
+
+    // If an asset has no children, display it as a simple ListTile.
+    if (childAssets.isEmpty) {
+      return ListTile(
+        contentPadding: EdgeInsets.only(left: (level * 16.0) + 16.0),
+        title: Text('${asset.name} - \$${totalValue.toStringAsFixed(2)}'),
+      );
+    }
+
+    // Use ExpansionTile for assets with children.
+    return ExpansionTile(
+      key: PageStorageKey<int>(asset.id), // Preserves expansion state on scroll
+      initiallyExpanded: _isExpanded[asset.id] ?? false,
+      onExpansionChanged: (isExpanded) =>
+          setState(() => _isExpanded[asset.id] = isExpanded),
+      title: Padding(
+        padding: EdgeInsets.only(left: level * 16.0),
+        child: Text('${asset.name} - \$${totalValue.toStringAsFixed(2)}'),
+      ),
+      children: childAssets
+          .map((child) => _buildAssetRow(child, childrenMap, level + 1))
+          .toList(),
+    );
   }
 }

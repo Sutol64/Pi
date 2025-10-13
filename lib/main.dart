@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:month_year_picker/month_year_picker.dart';
+import 'package:personal_finance_app_00/screens/settings_screen.dart';
+import 'package:personal_finance_app_00/services/theme_service.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'dart:convert';
 
@@ -24,41 +28,44 @@ Future<void> main() async {
   sqfliteFfiInit();
   databaseFactory = databaseFactoryFfi;
 
-  // The DatabaseHelper singleton will handle database initialization on its first use.
-  // No need to open it here.
-  runApp(const MyApp());
+  final prefs = await SharedPreferences.getInstance();
+  final themeService = ThemeService(prefs);
+
+  runApp(
+    ChangeNotifierProvider.value(
+      value: themeService,
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
-
-  const MyApp({super.key}); // added key
-
+  const MyApp({super.key});
 
   @override
-
   Widget build(BuildContext context) {
-
-    return MaterialApp(
-
-      title: 'Personal Finance',
-
-      theme: ThemeData.dark().copyWith(
-        primaryColor: Colors.blue,
-        // Keep default font settings so Material icons render correctly.
-      ),
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-        MonthYearPickerLocalizations.delegate,
-      ],
-
-      home: const HomeScreen(),
-      // Removed the /reports route definition
+    return Consumer<ThemeService>(
+      builder: (context, themeService, child) {
+        return MaterialApp(
+          title: 'Personal Finance',
+          theme: ThemeData.light().copyWith(
+            primaryColor: Colors.blue,
+          ),
+          darkTheme: ThemeData.dark().copyWith(
+            primaryColor: Colors.blue,
+          ),
+          themeMode: themeService.themeMode,
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+            MonthYearPickerLocalizations.delegate,
+          ],
+          home: const HomeScreen(),
+        );
+      },
     );
-
   }
-
 }
 
 class HomeScreen extends StatelessWidget {
@@ -203,29 +210,22 @@ class _EditorScreenState extends State<EditorScreen>
 
   // Refactored method to load recurring payments using API
   Future<void> _loadRecentRecurringPayments() async {
-    print('Fetching recent recurring payments...');
     try {
       // First fetch the list of recurring payments
       final paymentsJson = await _recurringApi.fetchRecent(limit: 3);
-      print('Received payments JSON: $paymentsJson');
       
       if (paymentsJson.isEmpty) {
-        print('Warning: Received empty JSON string for recurring payments. Skipping decode.');
         return;
       }
 
       final payments = List<Map<String, dynamic>>.from(jsonDecode(paymentsJson));
-      print('Decoded payments: $payments');
 
       // Immediately recompute values for all recurring payments
       Future<List<Map<String, dynamic>>> createComputedFuture() async {
-        print('Creating computed future for ${payments.length} payments');
         return Future.wait(payments.map((p) async {
-          print('Recomputing for account: ${p['accountId']}');
           // Force a recomputation to get fresh values
           final resultJson = await _recurringApi.recompute(p['accountId'] as String);
           final result = jsonDecode(resultJson) as Map<String, dynamic>? ?? <String, dynamic>{};
-          print('Recompute result: $result');
           return result;
         }).toList());
       }
@@ -235,11 +235,8 @@ class _EditorScreenState extends State<EditorScreen>
           _recentRecurringPayments = payments;
           _computedPaymentsFuture = createComputedFuture();
         });
-        print('State updated with ${payments.length} payments');
       }
     } catch (e, stackTrace) {
-      print('Error loading recurring payments: $e');
-      print('Stack trace: $stackTrace');
     }
   }
 
@@ -367,17 +364,14 @@ class _EditorScreenState extends State<EditorScreen>
       // Recompute recurring payments for any affected accounts
       if (mounted) {
         final affectedAccounts = linesForDb.map((l) => l['account'] as String).toSet();
-        print('Checking for recurring payments to update for accounts: $affectedAccounts');
         
         // Refresh recurring payments list to reflect any updates
         await _loadRecentRecurringPayments();
         
         if (_recentRecurringPayments.isNotEmpty) {
-          print('Found ${_recentRecurringPayments.length} recurring payments to check');
           for (final payment in _recentRecurringPayments) {
             final accountId = payment['accountId'] as String;
             if (affectedAccounts.contains(accountId)) {
-              print('Recomputing recurring payment for account: $accountId');
               await _recurringApi.recompute(accountId);
             }
           }
@@ -449,7 +443,6 @@ class _EditorScreenState extends State<EditorScreen>
       return;
     }
     try {
-      print('Setting up recurring payment with accountId: $_recurringAccountId, rootCategory: $_recurringAccountRoot');
       
       // Call the API to compute and save the recurring payment.
       // The backend will handle the calculation based on transaction history.
@@ -459,20 +452,14 @@ class _EditorScreenState extends State<EditorScreen>
         // 'method' will default to 'auto' on the backend
       });
       
-      print('Recurring payment API response: $response');
-      
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Recurring payment saved successfully!'))
       );
       
-      print('Loading recent recurring payments after save...');
       await _loadRecentRecurringPayments();
-      print('Recent recurring payments loaded');
       
     } catch (e, stackTrace) {
-      print('Error saving recurring payment: $e');
-      print('Stack trace: $stackTrace');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to save recurring payment: $e')),
@@ -741,7 +728,7 @@ class _EditorScreenState extends State<EditorScreen>
                     icon: const Icon(Icons.add),
                     label: const Text('Add Line'),
                     style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: Theme.of(context).primaryColor),
+                      side: BorderSide(color: Theme.of(context).colorScheme.primary),
                     ),
                   ),
                 ),
@@ -749,7 +736,7 @@ class _EditorScreenState extends State<EditorScreen>
                   icon: const Icon(Icons.save),
                   onPressed: _submit,
                   tooltip: 'Save Transaction',
-                  color: Theme.of(context).primaryColor,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
                 // Semantics(
                 //   label: 'Save Transaction',
@@ -810,7 +797,7 @@ class _EditorScreenState extends State<EditorScreen>
                   icon: const Icon(Icons.save),
                   onPressed: _setupRecurringPayment,
                   tooltip: 'Save Recurring Payment',
-                  color: Theme.of(context).primaryColor,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
               ],
             ),
@@ -1052,22 +1039,6 @@ class _EntryLine {
     String? initialAmount,
 
   }) : amountController = TextEditingController(text: initialAmount ?? '');
-
-}
-
-class SettingsScreen extends StatelessWidget {
-
-  const SettingsScreen({super.key});
-
-  
-
-  @override
-
-  Widget build(BuildContext context) {
-
-    return const Center(child: Text('Settings'));
-
-  }
 
 }
 
@@ -1556,7 +1527,7 @@ class _AccountInputState extends State<AccountInput> {
 
       borderRadius: BorderRadius.circular(8),
 
-      borderSide: BorderSide(color: Theme.of(context).primaryColor, width: 1.5),
+      borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 1.5),
 
     );
 
@@ -1590,7 +1561,7 @@ class _AccountInputState extends State<AccountInput> {
 
               ),
 
-            child: Icon(Icons.add, color: Theme.of(context).primaryColor, size: 18),
+            child: Icon(Icons.add, color: Theme.of(context).colorScheme.primary, size: 18),
 
           ),
 
@@ -1717,12 +1688,13 @@ class _AccountInputState extends State<AccountInput> {
                   message: 'Click to change root account',
 
                   child: Chip(
-
-                    avatar: Icon(_rootIcons[_selectedRootName], size: 16, color: Colors.grey.shade800),
-
+                    avatar: Icon(
+                      _rootIcons[_selectedRootName],
+                      size: 16,
+                      color: Theme.of(context).colorScheme.onSecondaryContainer,
+                    ),
                     label: Text(_selectedRootName!, style: const TextStyle(fontWeight: FontWeight.bold)),
-
-                    backgroundColor: Colors.grey.shade200,
+                    backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
 
                     onDeleted: () {
 
@@ -1773,10 +1745,8 @@ class _AccountInputState extends State<AccountInput> {
                     message: _path[i].name,
 
                     child: Chip(
-
                       label: Text(_path[i].name),
-
-                      backgroundColor: Colors.grey.shade100,
+                      backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
 
                       onDeleted: () {
 
