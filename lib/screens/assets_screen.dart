@@ -139,7 +139,6 @@ class _AssetsScreenState extends State<AssetsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       // The MonthYearPicker needs a Localizations widget ancestor.
-      backgroundColor: Colors.grey.shade900,
       body: Column(
         children: [
           Padding(
